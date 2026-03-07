@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { Request, Response } from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { GoogleGenAI } from "@google/genai";
@@ -10,11 +10,12 @@ const app = express();
 const port = process.env.PORT || 3000;
 
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'dist')));
+// When compiled, this file will be in dist-server/, so we go up one directory to find dist/
+app.use(express.static(path.join(__dirname, '..', 'dist')));
 
 const ai = new GoogleGenAI({});
 
-app.post('/api/generate-image', async (req, res) => {
+app.post('/api/generate-image', async (req: Request, res: Response): Promise<any> => {
   try {
     const { prompt } = req.body;
     if (!prompt) {
@@ -48,8 +49,8 @@ app.post('/api/generate-image', async (req, res) => {
   }
 });
 
-app.get(/^(?!\/api).+/, (req, res) => {
-  res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+app.get(/^(?!\/api).+/, (req: Request, res: Response) => {
+  res.sendFile(path.join(__dirname, '..', 'dist', 'index.html'));
 });
 
 app.listen(port, () => {
