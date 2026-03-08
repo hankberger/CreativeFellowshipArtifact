@@ -2,8 +2,21 @@ import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { GoogleGenAI } from "@google/genai";
+import { v4 as uuidv4 } from 'uuid';
+import * as fs from 'fs';
+import sqlite3 from 'sqlite3';
+import { open } from 'sqlite';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+// Initialize SQLite database
+let db;
+(async () => {
+    db = await open({
+        filename: './database.sqlite',
+        driver: sqlite3.Database
+    });
+    await db.exec('CREATE TABLE IF NOT EXISTS images (id TEXT PRIMARY KEY)');
+})();
 const app = express();
 const port = process.env.PORT || 3000;
 app.use(express.json());
@@ -30,7 +43,17 @@ app.post('/api/generate-image', async (req, res) => {
             }
         }
         if (base64Image) {
-            res.json({ image: `data:image/png;base64,${base64Image}` });
+            const id = uuidv4();
+            const filename = `${id}.png`;
+            const imagesDir = path.join(__dirname, '..', 'dist', 'images');
+            if (!fs.existsSync(imagesDir)) {
+                fs.mkdirSync(imagesDir, { recursive: true });
+            }
+            const filePath = path.join(imagesDir, filename);
+            const buffer = Buffer.from(base64Image, 'base64');
+            fs.writeFileSync(filePath, buffer);
+            await db.run('INSERT INTO images (id) VALUES (?)', [id]);
+            res.json({ image: `/images/${filename}` });
         }
         else {
             res.status(500).json({ error: 'No image data returned from Gemini API' });
