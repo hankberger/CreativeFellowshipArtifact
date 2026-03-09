@@ -1,8 +1,13 @@
 import { useRef, useEffect, useCallback, useState } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { PointerLockControls as DreiPointerLockControls, Grid } from '@react-three/drei'
+import {
+  PointerLockControls as DreiPointerLockControls,
+  OrbitControls as DreiOrbitControls,
+  TransformControls as DreiTransformControls,
+  Grid,
+} from '@react-three/drei'
 import * as THREE from 'three'
-import type { PointerLockControls as PointerLockControlsImpl } from 'three-stdlib'
+import type { PointerLockControls as PointerLockControlsImpl, OrbitControls as OrbitControlsImpl } from 'three-stdlib'
 
 interface AcceptedImage {
   id: number;
@@ -26,7 +31,7 @@ function Cube() {
 const MOVE_SPEED = 5
 const PLAYER_HEIGHT = 2
 
-function FirstPersonMovement() {
+function FirstPersonMovement({ disabled }: { disabled: boolean }) {
   const { camera } = useThree()
   const keys = useRef<Record<string, boolean>>({})
 
@@ -48,6 +53,8 @@ function FirstPersonMovement() {
   }, [onKeyDown, onKeyUp])
 
   useFrame((_, delta) => {
+    if (disabled) return
+
     const forward = new THREE.Vector3()
     camera.getWorldDirection(forward)
     forward.y = 0
@@ -77,18 +84,18 @@ function FirstPersonMovement() {
   return null
 }
 
-function JsonControls({ panelOpen }: { panelOpen: boolean }) {
+function JsonControls({ disabled }: { disabled: boolean }) {
   const controlsRef = useRef<PointerLockControlsImpl>(null!)
   const { gl } = useThree()
 
   useEffect(() => {
-    if (panelOpen) {
+    if (disabled) {
       controlsRef.current?.unlock()
     }
-  }, [panelOpen])
+  }, [disabled])
 
   useEffect(() => {
-    if (panelOpen) {
+    if (disabled) {
       const preventLock = (e: MouseEvent) => {
         e.stopPropagation()
       }
@@ -96,7 +103,7 @@ function JsonControls({ panelOpen }: { panelOpen: boolean }) {
       canvas.addEventListener('click', preventLock, true)
       return () => canvas.removeEventListener('click', preventLock, true)
     }
-  }, [panelOpen, gl])
+  }, [disabled, gl])
 
   return <DreiPointerLockControls ref={controlsRef} />
 }
@@ -154,40 +161,150 @@ function ImagePlane({ url, id, selected }: { url: string; id: number; selected: 
   )
 }
 
-function SelectionRaycaster({ onSelect }: { onSelect: (id: number | null) => void }) {
+function HoldToSelect({ disabled, onHoldStart, onHoldEnd }: { disabled: boolean; onHoldStart: (id: number) => void; onHoldEnd: () => void }) {
   const { camera, scene, gl } = useThree()
+  const holdingRef = useRef<number | null>(null)
+  const raycasterRef = useRef(new THREE.Raycaster())
+  const disabledRef = useRef(disabled)
+  disabledRef.current = disabled
+
+  const getHitImageId = useCallback((): number | null => {
+    raycasterRef.current.setFromCamera(new THREE.Vector2(0, 0), camera)
+    const intersects = raycasterRef.current.intersectObjects(scene.children, true)
+    for (const hit of intersects) {
+      let obj: THREE.Object3D | null = hit.object
+      while (obj) {
+        if (obj.userData.imageId != null) {
+          return obj.userData.imageId as number
+        }
+        obj = obj.parent
+      }
+    }
+    return null
+  }, [camera, scene])
 
   useEffect(() => {
-    const raycaster = new THREE.Raycaster()
-    const handleClick = () => {
+    const handleMouseDown = () => {
+      if (disabledRef.current) return
       if (!document.pointerLockElement) return
-      raycaster.setFromCamera(new THREE.Vector2(0, 0), camera)
-      const intersects = raycaster.intersectObjects(scene.children, true)
-
-      for (const hit of intersects) {
-        let obj: THREE.Object3D | null = hit.object
-        while (obj) {
-          if (obj.userData.imageId != null) {
-            onSelect(obj.userData.imageId)
-            return
-          }
-          obj = obj.parent
-        }
+      const id = getHitImageId()
+      if (id !== null) {
+        holdingRef.current = id
+        onHoldStart(id)
       }
-      onSelect(null)
     }
 
-    gl.domElement.addEventListener('click', handleClick)
-    return () => gl.domElement.removeEventListener('click', handleClick)
-  }, [camera, scene, gl, onSelect])
+    const handleMouseUp = () => {
+      if (holdingRef.current !== null) {
+        holdingRef.current = null
+        onHoldEnd()
+      }
+    }
+
+    gl.domElement.addEventListener('mousedown', handleMouseDown)
+    window.addEventListener('mouseup', handleMouseUp)
+    return () => {
+      gl.domElement.removeEventListener('mousedown', handleMouseDown)
+      window.removeEventListener('mouseup', handleMouseUp)
+    }
+  }, [gl, getHitImageId, onHoldStart, onHoldEnd])
+
+  // Cancel hold if disabled or crosshair moves off target
+  useFrame(() => {
+    if (holdingRef.current !== null) {
+      if (disabledRef.current) {
+        holdingRef.current = null
+        onHoldEnd()
+        return
+      }
+      const currentId = getHitImageId()
+      if (currentId !== holdingRef.current) {
+        holdingRef.current = null
+        onHoldEnd()
+      }
+    }
+  })
 
   return null
 }
 
-export default function ThreeScene({ panelOpen, acceptedImages }: { panelOpen: boolean; acceptedImages: AcceptedImage[] }) {
-  const [selectedId, setSelectedId] = useState<number | null>(null)
-  const handleSelect = useCallback((id: number | null) => setSelectedId(id), [])
+function SelectionModeControls({
+  selectedImageId,
+  transformMode,
+}: {
+  selectedImageId: number | null
+  transformMode: 'translate' | 'rotate' | 'scale'
+}) {
+  const { scene, camera } = useThree()
+  const orbitRef = useRef<OrbitControlsImpl>(null!)
+  const [targetObject, setTargetObject] = useState<THREE.Object3D | null>(null)
 
+  useEffect(() => {
+    if (selectedImageId == null) {
+      setTargetObject(null)
+      return
+    }
+    let result: THREE.Object3D | null = null
+    scene.traverse((obj) => {
+      if (obj.userData.imageId === selectedImageId) {
+        result = obj
+      }
+    })
+    const found = result as THREE.Object3D | null
+    setTargetObject(found)
+
+    if (found && orbitRef.current) {
+      const pos = new THREE.Vector3()
+      found.getWorldPosition(pos)
+      orbitRef.current.target.copy(pos)
+
+      // Position camera to look at object from a nice angle
+      const offset = new THREE.Vector3()
+      camera.getWorldDirection(offset)
+      offset.multiplyScalar(-4)
+      camera.position.copy(pos).add(offset)
+      camera.position.y = Math.max(camera.position.y, 1)
+
+      orbitRef.current.update()
+    }
+  }, [selectedImageId, scene, camera])
+
+  return (
+    <>
+      <DreiOrbitControls
+        ref={orbitRef}
+        makeDefault
+        enableDamping
+      />
+      {targetObject && (
+        <DreiTransformControls
+          object={targetObject}
+          mode={transformMode}
+        />
+      )}
+    </>
+  )
+}
+
+interface ThreeSceneProps {
+  panelOpen: boolean
+  acceptedImages: AcceptedImage[]
+  selectionMode: boolean
+  selectedImageId: number | null
+  onHoldStart: (id: number) => void
+  onHoldEnd: () => void
+  transformMode: 'translate' | 'rotate' | 'scale'
+}
+
+export default function ThreeScene({
+  panelOpen,
+  acceptedImages,
+  selectionMode,
+  selectedImageId,
+  onHoldStart,
+  onHoldEnd,
+  transformMode,
+}: ThreeSceneProps) {
   return (
     <Canvas
       camera={{ position: [0, PLAYER_HEIGHT, 5], fov: 60 }}
@@ -195,12 +312,18 @@ export default function ThreeScene({ panelOpen, acceptedImages }: { panelOpen: b
     >
       <ambientLight intensity={0.5} />
       <pointLight position={[10, 10, 10]} />
-      <JsonControls panelOpen={panelOpen} />
-      <FirstPersonMovement />
-      <SelectionRaycaster onSelect={handleSelect} />
+      <JsonControls disabled={panelOpen || selectionMode} />
+      <FirstPersonMovement disabled={selectionMode} />
+      <HoldToSelect disabled={selectionMode} onHoldStart={onHoldStart} onHoldEnd={onHoldEnd} />
+      {selectionMode && (
+        <SelectionModeControls
+          selectedImageId={selectedImageId}
+          transformMode={transformMode}
+        />
+      )}
       <Cube />
       {acceptedImages.map((img) => (
-        <ImagePlane key={img.id} id={img.id} url={img.url} selected={selectedId === img.id} />
+        <ImagePlane key={img.id} id={img.id} url={img.url} selected={selectedImageId === img.id} />
       ))}
       <Grid
         position={[0, -1, 0]}

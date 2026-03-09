@@ -1,6 +1,15 @@
 /* Crosshair */
-.crosshair {
+.crosshair-container {
   position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 2;
+  pointer-events: none;
+}
+
+.crosshair {
+  position: absolute;
   top: 50%;
   left: 50%;
   width: 6px;
@@ -8,8 +17,15 @@
   background: white;
   border-radius: 50%;
   transform: translate(-50%, -50%);
-  z-index: 2;
-  pointer-events: none;
+}
+
+.hold-ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 44px;
+  height: 44px;
+  transform: translate(-50%, -50%);
 }
 
 /* Floating panel overlay */
@@ -310,4 +326,105 @@
   border-color: rgba(100, 108, 255, 0.5) !important;
   color: #a78bfa !important;
   font-weight: 700;
+}
+
+/* Selection mode overlay */
+.selection-mode-overlay {
+  position: fixed;
+  bottom: 2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.transform-mode-buttons {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.transform-btn {
+  background: rgba(15, 15, 25, 0.85);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.7);
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.transform-btn kbd {
+  display: inline-block;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 3px;
+  padding: 0.05rem 0.3rem;
+  font-family: inherit;
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.4);
+  line-height: 1.4;
+}
+
+.transform-btn:hover {
+  border-color: rgba(100, 108, 255, 0.5);
+  color: #fff;
+}
+
+.transform-btn.active {
+  background: rgba(100, 108, 255, 0.3);
+  border-color: #646cff;
+  color: #fff;
+  font-weight: 600;
+}
+
+.transform-btn.active kbd {
+  background: rgba(100, 108, 255, 0.3);
+  border-color: rgba(100, 108, 255, 0.5);
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.accept-placement-btn {
+  background: linear-gradient(135deg, #10b981, #059669);
+  border: none;
+  color: #fff;
+  padding: 0.7rem 2rem;
+  border-radius: 10px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s, transform 0.2s;
+  box-shadow: 0 4px 20px rgba(16, 185, 129, 0.3);
+}
+
+.accept-placement-btn:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.selection-hint {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.35);
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.selection-hint kbd {
+  display: inline-block;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 3px;
+  padding: 0.05rem 0.3rem;
+  font-family: inherit;
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.35);
+  line-height: 1.4;
 }

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import ThreeScene from './ThreeScene'
 import './App.css'
 
@@ -12,6 +12,8 @@ interface AcceptedImage {
   url: string;
 }
 
+const HOLD_DURATION = 2000
+
 function App() {
   const [prompt, setPrompt] = useState('Create a picture of a nano banana dish in a fancy restaurant with a Gemini theme')
   const [imageUrl, setImageUrl] = useState<string | null>(null)
@@ -20,6 +22,14 @@ function App() {
   const [gallery, setGallery] = useState<ImageRecord[]>([])
   const [panelOpen, setPanelOpen] = useState(false)
   const [acceptedImages, setAcceptedImages] = useState<AcceptedImage[]>([])
+  const [selectedImageId, setSelectedImageId] = useState<number | null>(null)
+  const [selectionMode, setSelectionMode] = useState(false)
+  const [transformMode, setTransformMode] = useState<'translate' | 'rotate' | 'scale'>('translate')
+
+  // Hold-to-select state
+  const [holdTarget, setHoldTarget] = useState<number | null>(null)
+  const [holdProgress, setHoldProgress] = useState(0)
+  const holdStartTime = useRef(0)
 
   const handleAccept = () => {
     if (imageUrl) {
@@ -28,19 +38,70 @@ function App() {
     }
   }
 
+  const handleHoldStart = useCallback((id: number) => {
+    setHoldTarget(id)
+    holdStartTime.current = performance.now()
+  }, [])
+
+  const handleHoldEnd = useCallback(() => {
+    setHoldTarget(null)
+    setHoldProgress(0)
+  }, [])
+
+  // Animate hold progress and trigger selection mode at completion
+  useEffect(() => {
+    if (holdTarget === null) return
+
+    let animFrame: number
+    const animate = () => {
+      const elapsed = performance.now() - holdStartTime.current
+      const progress = Math.min(elapsed / HOLD_DURATION, 1)
+      setHoldProgress(progress)
+
+      if (progress >= 1) {
+        setSelectedImageId(holdTarget)
+        setSelectionMode(true)
+        setTransformMode('translate')
+        setHoldTarget(null)
+        setHoldProgress(0)
+        return
+      }
+
+      animFrame = requestAnimationFrame(animate)
+    }
+    animFrame = requestAnimationFrame(animate)
+
+    return () => cancelAnimationFrame(animFrame)
+  }, [holdTarget])
+
+  const handleAcceptPlacement = useCallback(() => {
+    setSelectionMode(false)
+    setSelectedImageId(null)
+  }, [])
+
   const togglePanel = useCallback(() => {
     setPanelOpen(prev => !prev)
   }, [])
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.code === 'KeyE' && !(e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLInputElement)) {
+      if (e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLInputElement) return
+
+      if (selectionMode) {
+        if (e.code === 'KeyG') setTransformMode('translate')
+        if (e.code === 'KeyR') setTransformMode('rotate')
+        if (e.code === 'KeyT') setTransformMode('scale')
+        if (e.code === 'Enter' || e.code === 'Escape') handleAcceptPlacement()
+        return
+      }
+
+      if (e.code === 'KeyE') {
         togglePanel()
       }
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [togglePanel])
+  }, [togglePanel, selectionMode, handleAcceptPlacement])
 
   const fetchGallery = async () => {
     try {
@@ -93,10 +154,45 @@ function App() {
     }
   }
 
+  // SVG circle circumference for r=18
+  const circumference = 2 * Math.PI * 18
+
   return (
     <>
-      <div className="crosshair" />
-      <ThreeScene panelOpen={panelOpen} acceptedImages={acceptedImages} />
+      {!selectionMode && (
+        <div className="crosshair-container">
+          <div className="crosshair" />
+          {holdTarget !== null && (
+            <svg className="hold-ring" viewBox="0 0 44 44">
+              <circle
+                cx="22" cy="22" r="18"
+                fill="none"
+                stroke="rgba(100, 108, 255, 0.3)"
+                strokeWidth="3"
+              />
+              <circle
+                cx="22" cy="22" r="18"
+                fill="none"
+                stroke="#646cff"
+                strokeWidth="3"
+                strokeDasharray={circumference}
+                strokeDashoffset={circumference * (1 - holdProgress)}
+                strokeLinecap="round"
+                transform="rotate(-90 22 22)"
+              />
+            </svg>
+          )}
+        </div>
+      )}
+      <ThreeScene
+        panelOpen={panelOpen}
+        acceptedImages={acceptedImages}
+        selectionMode={selectionMode}
+        selectedImageId={selectedImageId}
+        onHoldStart={handleHoldStart}
+        onHoldEnd={handleHoldEnd}
+        transformMode={transformMode}
+      />
 
       {panelOpen && (
         <div className="floating-panel">
@@ -153,13 +249,47 @@ function App() {
           )}
         </div>
       )}
-      <div className="controls-guide">
-        <div className="controls-guide-title">Controls</div>
-        <div className="controls-guide-row"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Move</div>
-        <div className="controls-guide-row"><kbd>Mouse</kbd> Look</div>
-        <div className="controls-guide-row"><kbd>Click</kbd> to start &middot; <kbd>Esc</kbd> to unlock</div>
-        <div className="controls-guide-row controls-guide-action"><kbd className="kbd-highlight">E</kbd> Generate Image</div>
-      </div>
+
+      {selectionMode && (
+        <div className="selection-mode-overlay">
+          <div className="transform-mode-buttons">
+            <button
+              className={`transform-btn ${transformMode === 'translate' ? 'active' : ''}`}
+              onClick={() => setTransformMode('translate')}
+            >
+              Move <kbd>G</kbd>
+            </button>
+            <button
+              className={`transform-btn ${transformMode === 'rotate' ? 'active' : ''}`}
+              onClick={() => setTransformMode('rotate')}
+            >
+              Rotate <kbd>R</kbd>
+            </button>
+            <button
+              className={`transform-btn ${transformMode === 'scale' ? 'active' : ''}`}
+              onClick={() => setTransformMode('scale')}
+            >
+              Scale <kbd>T</kbd>
+            </button>
+          </div>
+          <button className="accept-placement-btn" onClick={handleAcceptPlacement}>
+            Accept Placement
+          </button>
+          <div className="selection-hint">
+            <kbd>Enter</kbd> or <kbd>Esc</kbd> to confirm
+          </div>
+        </div>
+      )}
+
+      {!selectionMode && (
+        <div className="controls-guide">
+          <div className="controls-guide-title">Controls</div>
+          <div className="controls-guide-row"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Move</div>
+          <div className="controls-guide-row"><kbd>Mouse</kbd> Look</div>
+          <div className="controls-guide-row"><kbd>Hold Click</kbd> to select object</div>
+          <div className="controls-guide-row controls-guide-action"><kbd className="kbd-highlight">E</kbd> Generate Image</div>
+        </div>
+      )}
     </>
   )
 }
