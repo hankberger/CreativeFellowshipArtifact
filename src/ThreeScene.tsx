@@ -11,7 +11,11 @@ import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
 
 interface AcceptedImage {
   id: number;
+  imageId: string;
   url: string;
+  position?: [number, number, number];
+  rotation?: [number, number, number];
+  scale?: [number, number, number];
 }
 
 function Cube() {
@@ -96,7 +100,17 @@ function JsonControls({ disabled }: { disabled: boolean }) {
   return <DreiPointerLockControls />
 }
 
-function ImagePlane({ url, id, selected }: { url: string; id: number; selected: boolean }) {
+function ImagePlane({
+  url, id, selected,
+  savedPosition, savedRotation, savedScale,
+  onTransformUpdate,
+}: {
+  url: string; id: number; selected: boolean;
+  savedPosition?: [number, number, number];
+  savedRotation?: [number, number, number];
+  savedScale?: [number, number, number];
+  onTransformUpdate?: (id: number, position: [number, number, number], rotation: [number, number, number], scale: [number, number, number]) => void;
+}) {
   const groupRef = useRef<THREE.Group>(null!)
   const { camera } = useThree()
   const [texture, setTexture] = useState<THREE.Texture | null>(null)
@@ -111,25 +125,43 @@ function ImagePlane({ url, id, selected }: { url: string; id: number; selected: 
 
   useEffect(() => {
     if (!initialized.current && groupRef.current && texture) {
-      const direction = new THREE.Vector3()
-      camera.getWorldDirection(direction)
-      direction.y = 0
-      direction.normalize()
+      if (savedPosition) {
+        // Restore saved transform from DB
+        groupRef.current.position.set(...savedPosition)
+        if (savedRotation) groupRef.current.rotation.set(...savedRotation)
+        if (savedScale) groupRef.current.scale.set(...savedScale)
+      } else {
+        // Compute from camera for newly placed images
+        const direction = new THREE.Vector3()
+        camera.getWorldDirection(direction)
+        direction.y = 0
+        direction.normalize()
 
-      const pos = camera.position.clone()
-      pos.addScaledVector(direction, 4)
-      pos.y = 0 // center plane at grid level
+        const pos = camera.position.clone()
+        pos.addScaledVector(direction, 4)
+        pos.y = 0
 
-      groupRef.current.position.copy(pos)
+        groupRef.current.position.copy(pos)
 
-      // Face the camera horizontally
-      const lookTarget = camera.position.clone()
-      lookTarget.y = pos.y
-      groupRef.current.lookAt(lookTarget)
+        const lookTarget = camera.position.clone()
+        lookTarget.y = pos.y
+        groupRef.current.lookAt(lookTarget)
+      }
 
       initialized.current = true
+
+      // Report initial transform
+      if (onTransformUpdate) {
+        const g = groupRef.current
+        onTransformUpdate(
+          id,
+          [g.position.x, g.position.y, g.position.z],
+          [g.rotation.x, g.rotation.y, g.rotation.z],
+          [g.scale.x, g.scale.y, g.scale.z],
+        )
+      }
     }
-  }, [texture, camera])
+  }, [texture, camera, savedPosition, savedRotation, savedScale, id, onTransformUpdate])
 
   if (!texture) return null
 
@@ -219,12 +251,15 @@ function HoldToSelect({ disabled, onHoldStart, onHoldEnd }: { disabled: boolean;
 function SelectionModeControls({
   selectedImageId,
   transformMode,
+  onTransformUpdate,
 }: {
   selectedImageId: number | null
   transformMode: 'translate' | 'rotate' | 'scale'
+  onTransformUpdate?: (id: number, position: [number, number, number], rotation: [number, number, number], scale: [number, number, number]) => void
 }) {
   const { scene, camera } = useThree()
   const orbitRef = useRef<OrbitControlsImpl>(null!)
+  const transformRef = useRef<any>(null!)
   const [targetObject, setTargetObject] = useState<THREE.Object3D | null>(null)
 
   useEffect(() => {
@@ -257,6 +292,26 @@ function SelectionModeControls({
     }
   }, [selectedImageId, scene, camera])
 
+  // Listen for drag-end on TransformControls to report updated transform
+  useEffect(() => {
+    const ctrl = transformRef.current
+    if (!ctrl || !targetObject || selectedImageId == null) return
+
+    const handleMouseUp = () => {
+      if (onTransformUpdate && targetObject) {
+        onTransformUpdate(
+          selectedImageId,
+          [targetObject.position.x, targetObject.position.y, targetObject.position.z],
+          [targetObject.rotation.x, targetObject.rotation.y, targetObject.rotation.z],
+          [targetObject.scale.x, targetObject.scale.y, targetObject.scale.z],
+        )
+      }
+    }
+
+    ctrl.addEventListener('mouseUp', handleMouseUp)
+    return () => ctrl.removeEventListener('mouseUp', handleMouseUp)
+  }, [targetObject, selectedImageId, onTransformUpdate])
+
   return (
     <>
       <DreiOrbitControls
@@ -266,6 +321,7 @@ function SelectionModeControls({
       />
       {targetObject && (
         <DreiTransformControls
+          ref={transformRef}
           object={targetObject}
           mode={transformMode}
         />
@@ -282,6 +338,7 @@ interface ThreeSceneProps {
   onHoldStart: (id: number) => void
   onHoldEnd: () => void
   transformMode: 'translate' | 'rotate' | 'scale'
+  onTransformUpdate: (id: number, position: [number, number, number], rotation: [number, number, number], scale: [number, number, number]) => void
 }
 
 export default function ThreeScene({
@@ -292,6 +349,7 @@ export default function ThreeScene({
   onHoldStart,
   onHoldEnd,
   transformMode,
+  onTransformUpdate,
 }: ThreeSceneProps) {
   return (
     <Canvas
@@ -307,11 +365,21 @@ export default function ThreeScene({
         <SelectionModeControls
           selectedImageId={selectedImageId}
           transformMode={transformMode}
+          onTransformUpdate={onTransformUpdate}
         />
       )}
       <Cube />
       {acceptedImages.map((img) => (
-        <ImagePlane key={img.id} id={img.id} url={img.url} selected={selectedImageId === img.id} />
+        <ImagePlane
+          key={img.id}
+          id={img.id}
+          url={img.url}
+          selected={selectedImageId === img.id}
+          savedPosition={img.position}
+          savedRotation={img.rotation}
+          savedScale={img.scale}
+          onTransformUpdate={onTransformUpdate}
+        />
       ))}
       <Grid
         position={[0, -1, 0]}

@@ -21,6 +21,20 @@ let db: any;
   await db.exec(
     "CREATE TABLE IF NOT EXISTS images (id TEXT PRIMARY KEY, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)",
   );
+  await db.exec(`CREATE TABLE IF NOT EXISTS scene_objects (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    image_id TEXT NOT NULL,
+    position_x REAL DEFAULT 0,
+    position_y REAL DEFAULT 0,
+    position_z REAL DEFAULT 0,
+    rotation_x REAL DEFAULT 0,
+    rotation_y REAL DEFAULT 0,
+    rotation_z REAL DEFAULT 0,
+    scale_x REAL DEFAULT 1,
+    scale_y REAL DEFAULT 1,
+    scale_z REAL DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
 })();
 
 const app = express();
@@ -129,6 +143,87 @@ app.post(
       }
     } catch (error) {
       console.error("Error generating image:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  },
+);
+
+// Scene objects CRUD
+app.get("/api/scene-objects", async (req: Request, res: Response) => {
+  try {
+    const rows = await db.all(
+      "SELECT id, image_id, position_x, position_y, position_z, rotation_x, rotation_y, rotation_z, scale_x, scale_y, scale_z FROM scene_objects ORDER BY created_at ASC",
+    );
+    const objects = rows.map((r: any) => ({
+      id: r.id,
+      imageId: r.image_id,
+      url: `/images/${r.image_id}.png`,
+      position: [r.position_x, r.position_y, r.position_z],
+      rotation: [r.rotation_x, r.rotation_y, r.rotation_z],
+      scale: [r.scale_x, r.scale_y, r.scale_z],
+    }));
+    res.json(objects);
+  } catch (error) {
+    console.error("Error fetching scene objects:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+app.post(
+  "/api/scene-objects",
+  async (req: Request, res: Response): Promise<any> => {
+    try {
+      const { imageId } = req.body;
+      if (!imageId) {
+        return res.status(400).json({ error: "imageId is required" });
+      }
+      const result = await db.run(
+        "INSERT INTO scene_objects (image_id) VALUES (?)",
+        [imageId],
+      );
+      res.json({ id: result.lastID });
+    } catch (error) {
+      console.error("Error creating scene object:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  },
+);
+
+app.put(
+  "/api/scene-objects/:id",
+  async (req: Request, res: Response): Promise<any> => {
+    try {
+      const { id } = req.params;
+      const {
+        positionX, positionY, positionZ,
+        rotationX, rotationY, rotationZ,
+        scaleX, scaleY, scaleZ,
+      } = req.body;
+      await db.run(
+        `UPDATE scene_objects SET
+          position_x = ?, position_y = ?, position_z = ?,
+          rotation_x = ?, rotation_y = ?, rotation_z = ?,
+          scale_x = ?, scale_y = ?, scale_z = ?
+        WHERE id = ?`,
+        [positionX, positionY, positionZ, rotationX, rotationY, rotationZ, scaleX, scaleY, scaleZ, id],
+      );
+      res.json({ ok: true });
+    } catch (error) {
+      console.error("Error updating scene object:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  },
+);
+
+app.delete(
+  "/api/scene-objects/:id",
+  async (req: Request, res: Response): Promise<any> => {
+    try {
+      const { id } = req.params;
+      await db.run("DELETE FROM scene_objects WHERE id = ?", [id]);
+      res.json({ ok: true });
+    } catch (error) {
+      console.error("Error deleting scene object:", error);
       res.status(500).json({ error: "Internal server error" });
     }
   },

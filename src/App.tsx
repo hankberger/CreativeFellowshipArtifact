@@ -9,7 +9,11 @@ interface ImageRecord {
 
 interface AcceptedImage {
   id: number;
+  imageId: string;
   url: string;
+  position?: [number, number, number];
+  rotation?: [number, number, number];
+  scale?: [number, number, number];
 }
 
 const HOLD_DURATION = 2000
@@ -31,14 +35,49 @@ function App() {
   const [holdProgress, setHoldProgress] = useState(0)
   const holdStartTime = useRef(0)
 
-  const handleAccept = () => {
+  // Track latest transforms reported by ThreeScene
+  const latestTransforms = useRef(new Map<number, { position: [number, number, number]; rotation: [number, number, number]; scale: [number, number, number] }>())
+
+  const handleTransformUpdate = useCallback((id: number, position: [number, number, number], rotation: [number, number, number], scale: [number, number, number]) => {
+    latestTransforms.current.set(id, { position, rotation, scale })
+  }, [])
+
+  // Load scene objects on mount
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch('/api/scene-objects')
+        if (res.ok) {
+          const data = await res.json()
+          setAcceptedImages(data)
+        }
+      } catch (err) {
+        console.error('Failed to load scene objects', err)
+      }
+    })()
+  }, [])
+
+  const handleAccept = async () => {
     if (imageUrl) {
-      const newId = Date.now()
-      setAcceptedImages(prev => [...prev, { id: newId, url: imageUrl }])
-      setPanelOpen(false)
-      setSelectedImageId(newId)
-      setSelectionMode(true)
-      setTransformMode('translate')
+      // Extract imageId from URL like /images/<uuid>.png
+      const match = imageUrl.match(/\/images\/(.+)\.png$/)
+      if (!match) return
+      const imageId = match[1]
+      try {
+        const res = await fetch('/api/scene-objects', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ imageId }),
+        })
+        const { id } = await res.json()
+        setAcceptedImages(prev => [...prev, { id, imageId, url: imageUrl }])
+        setPanelOpen(false)
+        setSelectedImageId(id)
+        setSelectionMode(true)
+        setTransformMode('translate')
+      } catch (err) {
+        console.error('Failed to create scene object', err)
+      }
     }
   }
 
@@ -78,10 +117,28 @@ function App() {
     return () => cancelAnimationFrame(animFrame)
   }, [holdTarget])
 
-  const handleAcceptPlacement = useCallback(() => {
+  const handleAcceptPlacement = useCallback(async () => {
+    if (selectedImageId != null) {
+      const t = latestTransforms.current.get(selectedImageId)
+      if (t) {
+        try {
+          await fetch(`/api/scene-objects/${selectedImageId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              positionX: t.position[0], positionY: t.position[1], positionZ: t.position[2],
+              rotationX: t.rotation[0], rotationY: t.rotation[1], rotationZ: t.rotation[2],
+              scaleX: t.scale[0], scaleY: t.scale[1], scaleZ: t.scale[2],
+            }),
+          })
+        } catch (err) {
+          console.error('Failed to save transform', err)
+        }
+      }
+    }
     setSelectionMode(false)
     setSelectedImageId(null)
-  }, [])
+  }, [selectedImageId])
 
   const togglePanel = useCallback(() => {
     setPanelOpen(prev => !prev)
@@ -196,6 +253,7 @@ function App() {
         onHoldStart={handleHoldStart}
         onHoldEnd={handleHoldEnd}
         transformMode={transformMode}
+        onTransformUpdate={handleTransformUpdate}
       />
 
       {panelOpen && (
