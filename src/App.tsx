@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import ThreeScene from './ThreeScene'
 import './App.css'
 
@@ -13,7 +13,21 @@ function App() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [gallery, setGallery] = useState<ImageRecord[]>([])
-  const [panelOpen, setPanelOpen] = useState(true)
+  const [panelOpen, setPanelOpen] = useState(false)
+
+  const togglePanel = useCallback(() => {
+    setPanelOpen(prev => !prev)
+  }, [])
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.code === 'KeyE' && !(e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLInputElement)) {
+        togglePanel()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [togglePanel])
 
   const fetchGallery = async () => {
     try {
@@ -68,13 +82,7 @@ function App() {
 
   return (
     <>
-      <ThreeScene />
-
-      {!panelOpen && (
-        <button className="panel-toggle" onClick={() => setPanelOpen(true)}>
-          Open Generator
-        </button>
-      )}
+      <ThreeScene panelOpen={panelOpen} />
 
       {panelOpen && (
         <div className="floating-panel">
@@ -128,6 +136,13 @@ function App() {
           )}
         </div>
       )}
+      <div className="controls-guide">
+        <div className="controls-guide-title">Controls</div>
+        <div className="controls-guide-row"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Move</div>
+        <div className="controls-guide-row"><kbd>Mouse</kbd> Look</div>
+        <div className="controls-guide-row"><kbd>Click</kbd> to start &middot; <kbd>Esc</kbd> to unlock</div>
+        <div className="controls-guide-row controls-guide-action"><kbd className="kbd-highlight">E</kbd> Generate Image</div>
+      </div>
     </>
   )
 }
