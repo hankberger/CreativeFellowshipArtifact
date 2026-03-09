@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import ThreeScene from './ThreeScene'
 import './App.css'
 
 interface ImageRecord {
@@ -12,6 +13,7 @@ function App() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [gallery, setGallery] = useState<ImageRecord[]>([])
+  const [panelOpen, setPanelOpen] = useState(true)
 
   const fetchGallery = async () => {
     try {
@@ -51,7 +53,7 @@ function App() {
       const data = await response.json()
       if (data.image) {
         setImageUrl(data.image)
-        fetchGallery() // refresh gallery
+        fetchGallery()
       } else if (data.error) {
         throw new Error(data.error)
       } else {
@@ -65,54 +67,68 @@ function App() {
   }
 
   return (
-    <div className="app-container" style={{ maxWidth: '800px', margin: '0 auto', padding: '2rem', textAlign: 'center' }}>
-      <h1>Gemini Image Generator</h1>
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '2rem' }}>
-        <textarea
-          value={prompt}
-          onChange={(e) => setPrompt(e.target.value)}
-          placeholder="Enter a prompt to generate an image..."
-          rows={4}
-          style={{ padding: '0.5rem', fontSize: '1rem', width: '100%' }}
-        />
-        <button
-          type="submit"
-          disabled={loading || !prompt.trim()}
-          style={{ padding: '0.5rem 1rem', fontSize: '1rem', cursor: loading ? 'not-allowed' : 'pointer' }}
-        >
-          {loading ? 'Generating...' : 'Generate Image'}
+    <>
+      <ThreeScene />
+
+      {!panelOpen && (
+        <button className="panel-toggle" onClick={() => setPanelOpen(true)}>
+          Open Generator
         </button>
-      </form>
-
-      {error && <div style={{ color: 'red', marginBottom: '1rem' }}>{error}</div>}
-
-      {imageUrl && (
-        <div style={{ marginBottom: '2rem' }}>
-          <h2>Generated Image:</h2>
-          <img src={imageUrl} alt="Generated" style={{ maxWidth: '100%', height: 'auto', borderRadius: '8px' }} />
-        </div>
       )}
 
-      {gallery.length > 0 && (
-        <div style={{ marginTop: '3rem', borderTop: '1px solid #ccc', paddingTop: '2rem' }}>
-          <h2>Gallery</h2>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem' }}>
-            {gallery.map((img) => (
-              <div key={img.id} style={{ border: '1px solid #ddd', padding: '0.5rem', borderRadius: '8px' }}>
-                <img
-                  src={`/images/${img.id}.png`}
-                  alt={`Generated at ${img.created_at}`}
-                  style={{ width: '100%', height: 'auto', display: 'block', borderRadius: '4px' }}
-                />
-                <p style={{ fontSize: '0.8rem', color: '#666', marginTop: '0.5rem' }}>
-                  {new Date(img.created_at).toLocaleString()}
-                </p>
-              </div>
-            ))}
+      {panelOpen && (
+        <div className="floating-panel">
+          <div className="panel-header">
+            <h1>Gemini Image Generator</h1>
+            <button className="panel-close" onClick={() => setPanelOpen(false)}>
+              &times;
+            </button>
           </div>
+
+          <form onSubmit={handleSubmit} className="panel-form">
+            <textarea
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              placeholder="Enter a prompt to generate an image..."
+              rows={4}
+            />
+            <button
+              type="submit"
+              disabled={loading || !prompt.trim()}
+              className="generate-btn"
+            >
+              {loading ? 'Generating...' : 'Generate Image'}
+            </button>
+          </form>
+
+          {error && <div className="panel-error">{error}</div>}
+
+          {imageUrl && (
+            <div className="panel-result">
+              <h2>Generated Image:</h2>
+              <img src={imageUrl} alt="Generated" />
+            </div>
+          )}
+
+          {gallery.length > 0 && (
+            <div className="panel-gallery">
+              <h2>Gallery</h2>
+              <div className="gallery-grid">
+                {gallery.map((img) => (
+                  <div key={img.id} className="gallery-item">
+                    <img
+                      src={`/images/${img.id}.png`}
+                      alt={`Generated at ${img.created_at}`}
+                    />
+                    <p>{new Date(img.created_at).toLocaleString()}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
-    </div>
+    </>
   )
 }
 
