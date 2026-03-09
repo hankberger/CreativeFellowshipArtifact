@@ -7,6 +7,11 @@ interface ImageRecord {
   created_at: string;
 }
 
+interface AcceptedImage {
+  id: number;
+  url: string;
+}
+
 function App() {
   const [prompt, setPrompt] = useState('Create a picture of a nano banana dish in a fancy restaurant with a Gemini theme')
   const [imageUrl, setImageUrl] = useState<string | null>(null)
@@ -14,6 +19,14 @@ function App() {
   const [error, setError] = useState<string | null>(null)
   const [gallery, setGallery] = useState<ImageRecord[]>([])
   const [panelOpen, setPanelOpen] = useState(false)
+  const [acceptedImages, setAcceptedImages] = useState<AcceptedImage[]>([])
+
+  const handleAccept = () => {
+    if (imageUrl) {
+      setAcceptedImages(prev => [...prev, { id: Date.now(), url: imageUrl }])
+      setPanelOpen(false)
+    }
+  }
 
   const togglePanel = useCallback(() => {
     setPanelOpen(prev => !prev)
@@ -82,7 +95,8 @@ function App() {
 
   return (
     <>
-      <ThreeScene panelOpen={panelOpen} />
+      <div className="crosshair" />
+      <ThreeScene panelOpen={panelOpen} acceptedImages={acceptedImages} />
 
       {panelOpen && (
         <div className="floating-panel">
@@ -115,6 +129,9 @@ function App() {
             <div className="panel-result">
               <h2>Generated Image:</h2>
               <img src={imageUrl} alt="Generated" />
+              <button className="accept-btn" onClick={handleAccept}>
+                Accept
+              </button>
             </div>
           )}
 

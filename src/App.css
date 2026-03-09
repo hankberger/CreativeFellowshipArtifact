@@ -1,3 +1,17 @@
+/* Crosshair */
+.crosshair {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  width: 6px;
+  height: 6px;
+  background: white;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 2;
+  pointer-events: none;
+}
+
 /* Floating panel overlay */
 .floating-panel {
   position: fixed;
@@ -154,6 +168,26 @@
   height: auto;
   border-radius: 10px;
   border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.accept-btn {
+  display: block;
+  width: 100%;
+  margin-top: 0.75rem;
+  background: linear-gradient(135deg, #10b981, #059669);
+  border: none;
+  color: #fff;
+  padding: 0.7rem 1.2rem;
+  border-radius: 10px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s, transform 0.2s;
+}
+
+.accept-btn:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
 }
 
 /* Gallery */
