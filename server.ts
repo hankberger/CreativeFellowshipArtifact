@@ -17,7 +17,7 @@ let db: any;
     filename: './database.sqlite',
     driver: sqlite3.Database
   });
-  await db.exec('CREATE TABLE IF NOT EXISTS images (id TEXT PRIMARY KEY)');
+  await db.exec('CREATE TABLE IF NOT EXISTS images (id TEXT PRIMARY KEY, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)');
 })();
 
 const app = express();
@@ -28,6 +28,16 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, '..', 'dist')));
 
 const ai = new GoogleGenAI({});
+
+app.get('/api/images', async (req: Request, res: Response) => {
+  try {
+    const images = await db.all('SELECT id, created_at FROM images ORDER BY created_at DESC');
+    res.json(images);
+  } catch (error) {
+    console.error('Error fetching images:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
 app.post('/api/generate-image', async (req: Request, res: Response): Promise<any> => {
   try {
