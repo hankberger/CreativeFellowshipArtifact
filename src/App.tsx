@@ -33,8 +33,12 @@ function App() {
 
   const handleAccept = () => {
     if (imageUrl) {
-      setAcceptedImages(prev => [...prev, { id: Date.now(), url: imageUrl }])
+      const newId = Date.now()
+      setAcceptedImages(prev => [...prev, { id: newId, url: imageUrl }])
       setPanelOpen(false)
+      setSelectedImageId(newId)
+      setSelectionMode(true)
+      setTransformMode('translate')
     }
   }
 

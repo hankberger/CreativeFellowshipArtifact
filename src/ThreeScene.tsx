@@ -7,7 +7,7 @@ import {
   Grid,
 } from '@react-three/drei'
 import * as THREE from 'three'
-import type { PointerLockControls as PointerLockControlsImpl, OrbitControls as OrbitControlsImpl } from 'three-stdlib'
+import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
 
 interface AcceptedImage {
   id: number;
@@ -85,27 +85,15 @@ function FirstPersonMovement({ disabled }: { disabled: boolean }) {
 }
 
 function JsonControls({ disabled }: { disabled: boolean }) {
-  const controlsRef = useRef<PointerLockControlsImpl>(null!)
-  const { gl } = useThree()
-
   useEffect(() => {
-    if (disabled) {
-      controlsRef.current?.unlock()
+    if (disabled && document.pointerLockElement) {
+      document.exitPointerLock()
     }
   }, [disabled])
 
-  useEffect(() => {
-    if (disabled) {
-      const preventLock = (e: MouseEvent) => {
-        e.stopPropagation()
-      }
-      const canvas = gl.domElement
-      canvas.addEventListener('click', preventLock, true)
-      return () => canvas.removeEventListener('click', preventLock, true)
-    }
-  }, [disabled, gl])
+  if (disabled) return null
 
-  return <DreiPointerLockControls ref={controlsRef} />
+  return <DreiPointerLockControls />
 }
 
 function ImagePlane({ url, id, selected }: { url: string; id: number; selected: boolean }) {
