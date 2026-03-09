@@ -6,6 +6,7 @@ import { v4 as uuidv4 } from 'uuid';
 import * as fs from 'fs';
 import sqlite3 from 'sqlite3';
 import { open } from 'sqlite';
+import { Jimp } from 'jimp';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 // Initialize SQLite database
@@ -39,9 +40,10 @@ app.post('/api/generate-image', async (req, res) => {
         if (!prompt) {
             return res.status(400).json({ error: 'Prompt is required' });
         }
+        const finalPrompt = `${prompt} with a pure white background`;
         const response = await ai.models.generateContent({
             model: "gemini-3.1-flash-image-preview",
-            contents: prompt,
+            contents: finalPrompt,
         });
         let base64Image = null;
         if (response.candidates && response.candidates[0] && response.candidates[0].content && response.candidates[0].content.parts) {
@@ -61,7 +63,20 @@ app.post('/api/generate-image', async (req, res) => {
             }
             const filePath = path.join(imagesDir, filename);
             const buffer = Buffer.from(base64Image, 'base64');
-            fs.writeFileSync(filePath, buffer);
+            // Process image with Jimp to make white background transparent
+            const image = await Jimp.read(buffer);
+            image.scan(0, 0, image.bitmap.width, image.bitmap.height, function (x, y, idx) {
+                const r = this.bitmap.data[idx + 0];
+                const g = this.bitmap.data[idx + 1];
+                const b = this.bitmap.data[idx + 2];
+                // Define a threshold for "white" (e.g., RGB values above 240)
+                if (r > 240 && g > 240 && b > 240) {
+                    // Set alpha to 0 (transparent)
+                    this.bitmap.data[idx + 3] = 0;
+                }
+            });
+            const modifiedBuffer = await image.getBuffer("image/png");
+            fs.writeFileSync(filePath, modifiedBuffer);
             await db.run('INSERT INTO images (id) VALUES (?)', [id]);
             res.json({ image: `/images/${filename}` });
         }
