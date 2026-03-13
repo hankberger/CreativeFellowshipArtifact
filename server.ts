@@ -239,13 +239,13 @@ app.delete(
 );
 
 // 404 for any unmatched API routes
-app.all("/api/*", (req: Request, res: Response) => {
+app.all("/api/{*path}", (req: Request, res: Response) => {
   res.status(404).json({ error: "Not found" });
 });
 
 // SPA catch-all: serve index.html only for navigation requests (no file extension)
-app.get("*", (req: Request, res: Response, next: Function) => {
-  if (path.extname(req.path)) {
+app.use((req: Request, res: Response, next) => {
+  if (req.method !== "GET" || path.extname(req.path)) {
     return next();
   }
   res.sendFile(path.join(projectRoot, "dist", "index.html"));
