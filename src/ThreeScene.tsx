@@ -337,7 +337,7 @@ function ImagePlane({
       camPos.y = chatBubbleRef.current.getWorldPosition(new THREE.Vector3()).y
       chatBubbleRef.current.lookAt(camPos)
       const baseY = planeSize[1] / 2 + 0.3
-      chatBubbleRef.current.position.y = baseY + Math.sin(performance.now() * 0.003) * 0.08
+      chatBubbleRef.current.position.y = baseY + Math.sin(performance.now() * 0.0015) * 0.04
     }
   })
 
@@ -360,7 +360,7 @@ function ImagePlane({
       {character && chatBubbleTexture && (
         <group ref={chatBubbleRef} position={[0, planeSize[1] / 2 + 0.3, 0]}>
           <mesh>
-            <planeGeometry args={[0.5, 0.5]} />
+            <planeGeometry args={[0.3, 0.3]} />
             <meshBasicMaterial map={chatBubbleTexture} transparent alphaTest={0.1} side={THREE.DoubleSide} />
           </mesh>
         </group>

@@ -32,6 +32,7 @@ let db: any;
     filename: path.join(dataDir, "database.sqlite"),
     driver: sqlite3.Database,
   });
+  await db.exec("PRAGMA foreign_keys = ON");
   await db.exec(
     "CREATE TABLE IF NOT EXISTS images (id TEXT PRIMARY KEY, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)",
   );
@@ -62,6 +63,16 @@ let db: any;
   if (!cols.some((c: any) => c.name === 'character')) {
     await db.exec("ALTER TABLE scene_objects ADD COLUMN character INTEGER DEFAULT 0");
   }
+
+  // Create character_dialog table
+  await db.exec(`CREATE TABLE IF NOT EXISTS character_dialog (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    scene_object_id INTEGER NOT NULL,
+    sort_order INTEGER DEFAULT 0,
+    text TEXT NOT NULL DEFAULT '',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (scene_object_id) REFERENCES scene_objects(id) ON DELETE CASCADE
+  )`);
 
   // Migration: add prompt column to images if missing
   const imgCols = await db.all("PRAGMA table_info(images)");
@@ -258,6 +269,55 @@ app.delete(
       res.json({ ok: true });
     } catch (error) {
       console.error("Error deleting scene object:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  },
+);
+
+// Character dialog CRUD
+app.get(
+  "/api/scene-objects/:id/dialog",
+  async (req: Request, res: Response): Promise<any> => {
+    try {
+      const { id } = req.params;
+      const rows = await db.all(
+        "SELECT id, text, sort_order FROM character_dialog WHERE scene_object_id = ? ORDER BY sort_order ASC",
+        [id],
+      );
+      res.json(rows);
+    } catch (error) {
+      console.error("Error fetching dialog:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  },
+);
+
+app.put(
+  "/api/scene-objects/:id/dialog",
+  async (req: Request, res: Response): Promise<any> => {
+    try {
+      const { id } = req.params;
+      const { entries } = req.body;
+      if (!Array.isArray(entries)) {
+        return res.status(400).json({ error: "entries array is required" });
+      }
+      // Replace all dialog for this object
+      await db.run("DELETE FROM character_dialog WHERE scene_object_id = ?", [id]);
+      for (let i = 0; i < entries.length; i++) {
+        const text = entries[i].text || "";
+        await db.run(
+          "INSERT INTO character_dialog (scene_object_id, sort_order, text) VALUES (?, ?, ?)",
+          [id, i, text],
+        );
+      }
+      // Return the saved entries
+      const rows = await db.all(
+        "SELECT id, text, sort_order FROM character_dialog WHERE scene_object_id = ? ORDER BY sort_order ASC",
+        [id],
+      );
+      res.json(rows);
+    } catch (error) {
+      console.error("Error saving dialog:", error);
       res.status(500).json({ error: "Internal server error" });
     }
   },

@@ -8,6 +8,11 @@ interface ImageRecord {
   created_at: string;
 }
 
+interface DialogEntry {
+  id?: number;
+  text: string;
+}
+
 interface AcceptedImage {
   id: number;
   imageId: string;
@@ -37,6 +42,8 @@ function App() {
   const [billboardIds, setBillboardIds] = useState<Set<number>>(new Set())
   const [characterIds, setCharacterIds] = useState<Set<number>>(new Set())
   const [gallerySearch, setGallerySearch] = useState('')
+  const [dialogEntries, setDialogEntries] = useState<DialogEntry[]>([])
+  const [dialogOpen, setDialogOpen] = useState(false)
 
   // Hold-to-select state
   const [holdTarget, setHoldTarget] = useState<number | null>(null)
@@ -145,6 +152,9 @@ function App() {
           })
           const isBillboard = billboardIds.has(selectedImageId)
           const isCharacter = characterIds.has(selectedImageId)
+          if (isCharacter && dialogEntries.length > 0) {
+            await saveDialog(selectedImageId, dialogEntries)
+          }
           setAcceptedImages(prev => prev.map(img =>
             img.id === selectedImageId
               ? { ...img, position: t.position, rotation: t.rotation, scale: t.scale, billboard: isBillboard, character: isCharacter }
@@ -157,7 +167,9 @@ function App() {
     }
     setSelectionMode(false)
     setSelectedImageId(null)
-  }, [selectedImageId, billboardIds, characterIds])
+    setDialogOpen(false)
+    setDialogEntries([])
+  }, [selectedImageId, billboardIds, characterIds, dialogEntries, saveDialog])
 
   const handleRemoveObject = useCallback(async () => {
     if (selectedImageId == null) return
@@ -180,6 +192,31 @@ function App() {
     setSelectionMode(false)
     setSelectedImageId(null)
   }, [selectedImageId])
+
+  const loadDialog = useCallback(async (objectId: number) => {
+    try {
+      const res = await fetch(`/api/scene-objects/${objectId}/dialog`)
+      if (res.ok) {
+        const data = await res.json()
+        setDialogEntries(data.length > 0 ? data : [{ text: '' }])
+      }
+    } catch (err) {
+      console.error('Failed to load dialog', err)
+      setDialogEntries([{ text: '' }])
+    }
+  }, [])
+
+  const saveDialog = useCallback(async (objectId: number, entries: DialogEntry[]) => {
+    try {
+      await fetch(`/api/scene-objects/${objectId}/dialog`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ entries }),
+      })
+    } catch (err) {
+      console.error('Failed to save dialog', err)
+    }
+  }, [])
 
   const togglePanel = useCallback(() => {
     setPanelOpen(prev => !prev)
@@ -477,16 +514,36 @@ function App() {
               className={`billboard-btn ${selectedImageId != null && characterIds.has(selectedImageId) ? 'active' : ''}`}
               onClick={() => {
                 if (selectedImageId == null) return
+                const wasCharacter = characterIds.has(selectedImageId)
                 setCharacterIds(prev => {
                   const next = new Set(prev)
                   if (next.has(selectedImageId)) next.delete(selectedImageId)
                   else next.add(selectedImageId)
                   return next
                 })
+                if (!wasCharacter) {
+                  loadDialog(selectedImageId)
+                  setDialogOpen(true)
+                } else {
+                  setDialogOpen(false)
+                }
               }}
             >
               Character
             </button>
+            {selectedImageId != null && characterIds.has(selectedImageId) && (
+              <button
+                className={`billboard-btn ${dialogOpen ? 'active' : ''}`}
+                onClick={() => {
+                  if (!dialogOpen && selectedImageId != null) {
+                    loadDialog(selectedImageId)
+                  }
+                  setDialogOpen(prev => !prev)
+                }}
+              >
+                Dialog
+              </button>
+            )}
           </div>
           <div className="snap-rotation-row">
             <span className="snap-rotation-label">Snap</span>
@@ -526,6 +583,62 @@ function App() {
               Flat
             </button>
           </div>
+          {dialogOpen && selectedImageId != null && characterIds.has(selectedImageId) && (
+            <div className="dialog-editor">
+              <div className="dialog-editor-header">
+                <span className="dialog-editor-title">Character Dialog</span>
+                <span className="dialog-editor-count">{dialogEntries.length} line{dialogEntries.length !== 1 ? 's' : ''}</span>
+              </div>
+              <div className="dialog-editor-entries">
+                {dialogEntries.map((entry, idx) => (
+                  <div key={idx} className="dialog-entry">
+                    <span className="dialog-entry-number">{idx + 1}</span>
+                    <textarea
+                      className="dialog-entry-text"
+                      value={entry.text}
+                      onChange={(e) => {
+                        const updated = [...dialogEntries]
+                        updated[idx] = { ...updated[idx], text: e.target.value }
+                        setDialogEntries(updated)
+                      }}
+                      placeholder="Enter dialog text..."
+                      rows={2}
+                    />
+                    <button
+                      className="dialog-entry-remove"
+                      onClick={() => {
+                        if (dialogEntries.length <= 1) return
+                        const updated = dialogEntries.filter((_, i) => i !== idx)
+                        setDialogEntries(updated)
+                      }}
+                      disabled={dialogEntries.length <= 1}
+                      title="Remove this line"
+                    >
+                      &times;
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <div className="dialog-editor-actions">
+                <button
+                  className="dialog-add-btn"
+                  onClick={() => setDialogEntries(prev => [...prev, { text: '' }])}
+                >
+                  + Add Line
+                </button>
+                <button
+                  className="dialog-save-btn"
+                  onClick={() => {
+                    if (selectedImageId != null) {
+                      saveDialog(selectedImageId, dialogEntries)
+                    }
+                  }}
+                >
+                  Save Dialog
+                </button>
+              </div>
+            </div>
+          )}
           <button className="accept-placement-btn" onClick={handleAcceptPlacement}>
             Accept Placement
           </button>

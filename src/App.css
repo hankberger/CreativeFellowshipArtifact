@@ -1090,3 +1090,153 @@
   border-color: var(--forge-border-hover);
   box-shadow: 0 0 40px var(--forge-glow-strong);
 }
+
+/* ─── Dialog Editor ─── */
+.dialog-editor {
+  background: var(--forge-surface);
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--forge-border);
+  border-radius: 4px;
+  padding: 0.75rem;
+  width: 340px;
+  max-height: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  animation: hud-appear 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.dialog-editor-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.dialog-editor-title {
+  font-family: 'Syne', sans-serif;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--forge-gold);
+}
+
+.dialog-editor-count {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.65rem;
+  color: var(--forge-text-muted);
+}
+
+.dialog-editor-entries {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  overflow-y: auto;
+  max-height: 200px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(232, 168, 73, 0.2) transparent;
+}
+
+.dialog-entry {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+}
+
+.dialog-entry-number {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.65rem;
+  color: var(--forge-text-muted);
+  min-width: 1.2rem;
+  text-align: right;
+  padding-top: 0.45rem;
+  flex-shrink: 0;
+}
+
+.dialog-entry-text {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--forge-border);
+  border-radius: 2px;
+  color: var(--forge-text);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.78rem;
+  padding: 0.35rem 0.5rem;
+  resize: vertical;
+  min-height: 2.2rem;
+  line-height: 1.4;
+  transition: border-color 0.2s;
+}
+
+.dialog-entry-text:focus {
+  outline: none;
+  border-color: var(--forge-border-hover);
+  box-shadow: 0 0 0 2px var(--forge-glow);
+}
+
+.dialog-entry-text::placeholder {
+  color: var(--forge-text-muted);
+}
+
+.dialog-entry-remove {
+  background: none;
+  border: 1px solid transparent;
+  color: var(--forge-text-muted);
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 0.2rem 0.35rem;
+  border-radius: 2px;
+  line-height: 1;
+  flex-shrink: 0;
+  transition: all 0.2s;
+}
+
+.dialog-entry-remove:hover:not(:disabled) {
+  color: #ff6b6b;
+  border-color: rgba(255, 107, 107, 0.3);
+  background: rgba(255, 107, 107, 0.08);
+}
+
+.dialog-entry-remove:disabled {
+  opacity: 0.2;
+  cursor: default;
+}
+
+.dialog-editor-actions {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.dialog-add-btn,
+.dialog-save-btn {
+  flex: 1;
+  background: var(--forge-surface);
+  border: 1px solid var(--forge-border);
+  color: var(--forge-text-dim);
+  padding: 0.4rem 0.75rem;
+  border-radius: 2px;
+  font-family: 'Syne', sans-serif;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: all 0.25s;
+}
+
+.dialog-add-btn:hover,
+.dialog-save-btn:hover {
+  border-color: var(--forge-border-hover);
+  color: var(--forge-text);
+}
+
+.dialog-save-btn {
+  background: rgba(232, 168, 73, 0.08);
+  border-color: rgba(232, 168, 73, 0.3);
+  color: var(--forge-gold);
+}
+
+.dialog-save-btn:hover {
+  background: rgba(232, 168, 73, 0.15);
+  border-color: var(--forge-gold);
+  box-shadow: 0 0 12px var(--forge-glow);
+}
