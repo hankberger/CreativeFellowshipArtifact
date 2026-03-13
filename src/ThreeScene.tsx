@@ -18,20 +18,6 @@ interface AcceptedImage {
   scale?: [number, number, number];
 }
 
-function Cube() {
-  const ref = useRef<THREE.Mesh>(null!)
-  useFrame((_, delta) => {
-    ref.current.rotation.x += delta * 0.5
-    ref.current.rotation.y += delta * 0.5
-  })
-  return (
-    <mesh ref={ref}>
-      <boxGeometry args={[1, 1, 1]} />
-      <meshStandardMaterial color="#646cff" />
-    </mesh>
-  )
-}
-
 const MOVE_SPEED = 5
 const PLAYER_HEIGHT = 2
 
@@ -163,19 +149,21 @@ function ImagePlane({
     }
   }, [texture, camera, savedPosition, savedRotation, savedScale, id, onTransformUpdate])
 
-  if (!texture) return null
-
   return (
     <group ref={groupRef} userData={{ imageId: id }}>
-      <mesh>
-        <planeGeometry args={[2, 2]} />
-        <meshStandardMaterial map={texture} transparent alphaTest={0.1} depthWrite={false} side={THREE.DoubleSide} />
-      </mesh>
-      {selected && (
-        <mesh position={[0, 0, -0.01]}>
-          <planeGeometry args={[2.15, 2.15]} />
-          <meshBasicMaterial color="#646cff" side={THREE.DoubleSide} transparent opacity={0.7} />
-        </mesh>
+      {texture && (
+        <>
+          <mesh>
+            <planeGeometry args={[2, 2]} />
+            <meshStandardMaterial map={texture} transparent alphaTest={0.1} depthWrite={false} side={THREE.DoubleSide} />
+          </mesh>
+          {selected && (
+            <mesh position={[0, 0, -0.01]}>
+              <planeGeometry args={[2.15, 2.15]} />
+              <meshBasicMaterial color="#646cff" side={THREE.DoubleSide} transparent opacity={0.7} />
+            </mesh>
+          )}
+        </>
       )}
     </group>
   )
@@ -206,7 +194,6 @@ function HoldToSelect({ disabled, onHoldStart, onHoldEnd }: { disabled: boolean;
   useEffect(() => {
     const handleMouseDown = () => {
       if (disabledRef.current) return
-      if (!document.pointerLockElement) return
       const id = getHitImageId()
       if (id !== null) {
         holdingRef.current = id
@@ -262,6 +249,7 @@ function SelectionModeControls({
   const transformRef = useRef<any>(null!)
   const [targetObject, setTargetObject] = useState<THREE.Object3D | null>(null)
 
+  // Find the target object when selectedImageId changes
   useEffect(() => {
     if (selectedImageId == null) {
       setTargetObject(null)
@@ -273,24 +261,39 @@ function SelectionModeControls({
         result = obj
       }
     })
-    const found = result as THREE.Object3D | null
-    setTargetObject(found)
+    setTargetObject(result)
+  }, [selectedImageId, scene])
 
-    if (found && orbitRef.current) {
-      const pos = new THREE.Vector3()
-      found.getWorldPosition(pos)
-      orbitRef.current.target.copy(pos)
-
-      // Position camera to look at object from a nice angle
-      const offset = new THREE.Vector3()
-      camera.getWorldDirection(offset)
-      offset.multiplyScalar(-4)
-      camera.position.copy(pos).add(offset)
-      camera.position.y = Math.max(camera.position.y, 1)
-
-      orbitRef.current.update()
+  // Retry finding the target if not found initially (e.g. texture still loading)
+  useFrame(() => {
+    if (selectedImageId != null && !targetObject) {
+      let result: THREE.Object3D | null = null
+      scene.traverse((obj) => {
+        if (obj.userData.imageId === selectedImageId) {
+          result = obj
+        }
+      })
+      if (result) setTargetObject(result)
     }
-  }, [selectedImageId, scene, camera])
+  })
+
+  // Position camera when target is found
+  useEffect(() => {
+    if (!targetObject || !orbitRef.current) return
+
+    const pos = new THREE.Vector3()
+    targetObject.getWorldPosition(pos)
+    orbitRef.current.target.copy(pos)
+
+    // Position camera to look at object from a nice angle
+    const offset = new THREE.Vector3()
+    camera.getWorldDirection(offset)
+    offset.multiplyScalar(-4)
+    camera.position.copy(pos).add(offset)
+    camera.position.y = Math.max(camera.position.y, 1)
+
+    orbitRef.current.update()
+  }, [targetObject, camera])
 
   // Listen for drag-end on TransformControls to report updated transform
   useEffect(() => {
@@ -359,7 +362,7 @@ export default function ThreeScene({
       <ambientLight intensity={0.5} />
       <pointLight position={[10, 10, 10]} />
       <JsonControls disabled={panelOpen || selectionMode} />
-      <FirstPersonMovement disabled={selectionMode} />
+      <FirstPersonMovement disabled={panelOpen || selectionMode} />
       <HoldToSelect disabled={selectionMode} onHoldStart={onHoldStart} onHoldEnd={onHoldEnd} />
       {selectionMode && (
         <SelectionModeControls
@@ -368,7 +371,6 @@ export default function ThreeScene({
           onTransformUpdate={onTransformUpdate}
         />
       )}
-      <Cube />
       {acceptedImages.map((img) => (
         <ImagePlane
           key={img.id}
@@ -390,7 +392,7 @@ export default function ThreeScene({
         sectionSize={5}
         sectionThickness={1}
         sectionColor="#ffffff"
-        fadeDistance={30}
+        fadeDistance={60}
         infiniteGrid
       />
     </Canvas>

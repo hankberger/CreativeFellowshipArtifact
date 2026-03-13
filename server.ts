@@ -1,3 +1,4 @@
+import "dotenv/config";
 import express, { Request, Response } from "express";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -44,7 +45,7 @@ app.use(express.json());
 // When compiled, this file will be in dist-server/, so we go up one directory to find dist/
 app.use(express.static(path.join(__dirname, "dist")));
 
-const ai = new GoogleGenAI({});
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 app.get("/api/images", async (req: Request, res: Response) => {
   try {

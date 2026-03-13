@@ -10,12 +10,13 @@
     "build:server": "tsc -p tsconfig.server.json",
     "lint": "eslint .",
     "preview": "vite preview",
-    "start": "NODE_ENV=production node dist-server/server.js"
+    "start": "node dist-server/server.js"
   },
   "dependencies": {
     "@google/genai": "^1.44.0",
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.5.0",
+    "dotenv": "^17.3.1",
     "express": "^5.2.1",
     "jimp": "^1.6.0",
     "react": "^19.2.0",

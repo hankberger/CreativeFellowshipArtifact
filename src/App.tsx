@@ -283,6 +283,28 @@ function App() {
 
           {error && <div className="panel-error">{error}</div>}
 
+          {loading && (
+            <div className="loading-canvas">
+              <div className="loading-aurora" />
+              <div className="loading-scan" />
+              <div className="loading-corner loading-corner-tl" />
+              <div className="loading-corner loading-corner-tr" />
+              <div className="loading-corner loading-corner-bl" />
+              <div className="loading-corner loading-corner-br" />
+              <div className="loading-center">
+                <div className="loading-ring" />
+                <div className="loading-ring loading-ring-inner" />
+                <div className="loading-pulse" />
+              </div>
+              <div className="loading-text">
+                Materializing
+                <span className="loading-dot" style={{ animationDelay: '0s' }}>.</span>
+                <span className="loading-dot" style={{ animationDelay: '0.3s' }}>.</span>
+                <span className="loading-dot" style={{ animationDelay: '0.6s' }}>.</span>
+              </div>
+            </div>
+          )}
+
           {imageUrl && (
             <div className="panel-result">
               <h2>Generated Image:</h2>

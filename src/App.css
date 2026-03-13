@@ -157,6 +157,177 @@
   cursor: not-allowed;
 }
 
+/* ─── Image Generation Loading State ─── */
+.loading-canvas {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: 1rem;
+  background: rgba(6, 6, 16, 0.95);
+  border: 1px solid rgba(100, 108, 255, 0.15);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  animation: canvas-fadein 0.4s ease-out;
+}
+
+@keyframes canvas-fadein {
+  from { opacity: 0; transform: scale(0.97); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+/* Shifting aurora gradient background */
+.loading-aurora {
+  position: absolute;
+  inset: -20%;
+  background:
+    radial-gradient(ellipse 80% 50% at 20% 40%, rgba(100, 108, 255, 0.25), transparent),
+    radial-gradient(ellipse 60% 80% at 80% 25%, rgba(139, 92, 246, 0.18), transparent),
+    radial-gradient(ellipse 70% 50% at 50% 85%, rgba(244, 114, 182, 0.12), transparent);
+  animation: aurora-drift 6s ease-in-out infinite alternate;
+  pointer-events: none;
+}
+
+@keyframes aurora-drift {
+  0%   { transform: translate(0, 0) scale(1) rotate(0deg); opacity: 0.5; }
+  50%  { transform: translate(5%, -3%) scale(1.08) rotate(2deg); opacity: 1; }
+  100% { transform: translate(-3%, 4%) scale(1.02) rotate(-2deg); opacity: 0.65; }
+}
+
+/* Sweeping scan line */
+.loading-scan {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1.5px;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    rgba(100, 108, 255, 0.3) 15%,
+    rgba(139, 92, 246, 0.7) 50%,
+    rgba(100, 108, 255, 0.3) 85%,
+    transparent 100%
+  );
+  box-shadow:
+    0 0 15px 2px rgba(100, 108, 255, 0.25),
+    0 0 40px 4px rgba(139, 92, 246, 0.08);
+  animation: scan-sweep 2.8s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes scan-sweep {
+  0%   { top: -2px; opacity: 0; }
+  5%   { opacity: 1; }
+  92%  { opacity: 1; }
+  100% { top: 100%; opacity: 0; }
+}
+
+/* Corner viewfinder brackets */
+.loading-corner {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  pointer-events: none;
+  opacity: 0.4;
+  animation: corner-pulse 3s ease-in-out infinite;
+}
+
+.loading-corner::before,
+.loading-corner::after {
+  content: '';
+  position: absolute;
+  background: rgba(100, 108, 255, 0.7);
+}
+
+.loading-corner-tl { top: 10px; left: 10px; }
+.loading-corner-tl::before { top: 0; left: 0; width: 18px; height: 1.5px; }
+.loading-corner-tl::after  { top: 0; left: 0; width: 1.5px; height: 18px; }
+
+.loading-corner-tr { top: 10px; right: 10px; }
+.loading-corner-tr::before { top: 0; right: 0; width: 18px; height: 1.5px; }
+.loading-corner-tr::after  { top: 0; right: 0; width: 1.5px; height: 18px; }
+
+.loading-corner-bl { bottom: 10px; left: 10px; }
+.loading-corner-bl::before { bottom: 0; left: 0; width: 18px; height: 1.5px; }
+.loading-corner-bl::after  { bottom: 0; left: 0; width: 1.5px; height: 18px; }
+
+.loading-corner-br { bottom: 10px; right: 10px; }
+.loading-corner-br::before { bottom: 0; right: 0; width: 18px; height: 1.5px; }
+.loading-corner-br::after  { bottom: 0; right: 0; width: 1.5px; height: 18px; }
+
+@keyframes corner-pulse {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.7; }
+}
+
+/* Orbiting rings */
+.loading-center {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  z-index: 1;
+}
+
+.loading-ring {
+  position: absolute;
+  inset: 0;
+  border: 1.5px solid transparent;
+  border-top-color: rgba(100, 108, 255, 0.8);
+  border-right-color: rgba(139, 92, 246, 0.25);
+  border-radius: 50%;
+  animation: ring-orbit 2.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+.loading-ring-inner {
+  inset: 12px;
+  border-top-color: rgba(244, 114, 182, 0.6);
+  border-right-color: rgba(100, 108, 255, 0.15);
+  animation-duration: 3.2s;
+  animation-direction: reverse;
+}
+
+@keyframes ring-orbit {
+  to { transform: rotate(360deg); }
+}
+
+/* Pulsing core */
+.loading-pulse {
+  position: absolute;
+  inset: 22px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(100, 108, 255, 0.5) 0%, rgba(139, 92, 246, 0.15) 70%, transparent 100%);
+  animation: core-breathe 2.4s ease-in-out infinite;
+}
+
+@keyframes core-breathe {
+  0%, 100% { transform: scale(0.7); opacity: 0.4; box-shadow: 0 0 12px rgba(100, 108, 255, 0.2); }
+  50%      { transform: scale(1.15); opacity: 1; box-shadow: 0 0 28px rgba(100, 108, 255, 0.4), 0 0 60px rgba(139, 92, 246, 0.15); }
+}
+
+/* Loading text */
+.loading-text {
+  position: relative;
+  z-index: 1;
+  margin-top: 1.25rem;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.45);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.loading-dot {
+  opacity: 0;
+  animation: dot-blink 1.5s ease-in-out infinite;
+}
+
+@keyframes dot-blink {
+  0%, 100% { opacity: 0; }
+  30%, 70% { opacity: 1; }
+}
+
 /* Error */
 .panel-error {
   color: #f87171;
