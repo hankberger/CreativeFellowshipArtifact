@@ -309,9 +309,21 @@ function App() {
             <div className="panel-result">
               <h2>Generated Image:</h2>
               <img src={imageUrl} alt="Generated" />
-              <button className="accept-btn" onClick={handleAccept}>
-                Accept
-              </button>
+              <div className="result-actions">
+                <button className="accept-btn" onClick={handleAccept}>
+                  Accept
+                </button>
+                <button
+                  className="recycle-btn"
+                  disabled={loading}
+                  onClick={() => {
+                    const fakeEvent = { preventDefault: () => {} } as React.FormEvent
+                    handleSubmit(fakeEvent)
+                  }}
+                >
+                  {loading ? 'Generating...' : '♻ Recycle'}
+                </button>
+              </div>
             </div>
           )}
 

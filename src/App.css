@@ -357,10 +357,14 @@
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.accept-btn {
-  display: block;
-  width: 100%;
+.result-actions {
+  display: flex;
+  gap: 0.5rem;
   margin-top: 0.75rem;
+}
+
+.accept-btn {
+  flex: 1;
   background: linear-gradient(135deg, #10b981, #059669);
   border: none;
   color: #fff;
@@ -375,6 +379,29 @@
 .accept-btn:hover {
   opacity: 0.9;
   transform: translateY(-1px);
+}
+
+.recycle-btn {
+  flex: 1;
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  border: none;
+  color: #fff;
+  padding: 0.7rem 1.2rem;
+  border-radius: 10px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s, transform 0.2s;
+}
+
+.recycle-btn:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.recycle-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* Gallery */
