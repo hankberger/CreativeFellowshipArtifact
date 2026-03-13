@@ -25,6 +25,7 @@ const PLAYER_HEIGHT = 2
 const COLLISION_DISTANCE = 0.6
 const JUMP_VELOCITY = 6
 const GRAVITY = -15
+const STEP_HEIGHT = 0.5 // max height player can step up without jumping
 
 function FirstPersonMovement({ disabled }: { disabled: boolean }) {
   const { camera, scene } = useThree()
@@ -67,14 +68,19 @@ function FirstPersonMovement({ disabled }: { disabled: boolean }) {
   }, [scene])
 
   // Check if moving in a direction would collide
-  // Cast rays at multiple heights to detect rotated/tilted planes
+  // Cast rays at multiple heights; allow passage if hit is below step-up height (ramp)
   const canMove = useCallback((origin: THREE.Vector3, direction: THREE.Vector3, distance: number) => {
     const collidables = getCollidables()
     const threshold = distance + COLLISION_DISTANCE
-    // Ray heights relative to feet (origin.y is camera/eye level = PLAYER_HEIGHT above ground)
-    const groundY = origin.y - PLAYER_HEIGHT
-    const rayHeights = [groundY + 0.2, groundY + PLAYER_HEIGHT * 0.5, groundY + PLAYER_HEIGHT * 0.85]
+    const feetY = origin.y - PLAYER_HEIGHT
     const testOrigin = new THREE.Vector3()
+
+    // Rays above step height block movement; rays at step height allow ramp walk-up
+    const rayHeights = [
+      feetY + STEP_HEIGHT + 0.1, // just above step-up zone — blocks walls
+      feetY + PLAYER_HEIGHT * 0.5,
+      feetY + PLAYER_HEIGHT * 0.85,
+    ]
 
     for (const h of rayHeights) {
       testOrigin.set(origin.x, h, origin.z)
@@ -136,8 +142,45 @@ function FirstPersonMovement({ disabled }: { disabled: boolean }) {
     velocityY.current += GRAVITY * delta
     camera.position.y += velocityY.current * delta
 
-    // Land on ground
-    if (camera.position.y <= PLAYER_HEIGHT) {
+    // Downward raycast to find surfaces below the player
+    const feetPos = new THREE.Vector3(camera.position.x, camera.position.y, camera.position.z)
+    const downDir = new THREE.Vector3(0, -1, 0)
+    raycaster.current.set(feetPos, downDir)
+    raycaster.current.far = PLAYER_HEIGHT + 2 // check below feet plus some margin
+    const collidables = getCollidables()
+    const downHits = raycaster.current.intersectObjects(collidables, false)
+
+    // Find the highest surface below the player's feet
+    let surfaceY = 0 // world ground
+    for (const hit of downHits) {
+      const hitSurfaceY = hit.point.y
+      // Only count surfaces that are roughly below the player (not above head)
+      if (hitSurfaceY <= camera.position.y && hitSurfaceY > surfaceY) {
+        surfaceY = hitSurfaceY
+      }
+    }
+
+    const targetCameraY = surfaceY + PLAYER_HEIGHT
+
+    // Step-up: if walking and the surface is slightly above feet, step up automatically
+    if (isGrounded.current && surfaceY > 0) {
+      const feetY = camera.position.y - PLAYER_HEIGHT
+      const stepDelta = surfaceY - feetY
+      if (stepDelta > 0 && stepDelta <= STEP_HEIGHT) {
+        camera.position.y = targetCameraY
+        velocityY.current = 0
+      }
+    }
+
+    // Land on surface or ground
+    if (camera.position.y <= targetCameraY) {
+      camera.position.y = targetCameraY
+      velocityY.current = 0
+      isGrounded.current = true
+    }
+
+    // Fallback: never fall below world ground
+    if (camera.position.y < PLAYER_HEIGHT) {
       camera.position.y = PLAYER_HEIGHT
       velocityY.current = 0
       isGrounded.current = true
