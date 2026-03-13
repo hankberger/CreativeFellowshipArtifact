@@ -23,11 +23,15 @@ const MOVE_SPEED = 5
 const SPRINT_MULTIPLIER = 2.5
 const PLAYER_HEIGHT = 2
 const COLLISION_DISTANCE = 0.6
+const JUMP_VELOCITY = 6
+const GRAVITY = -15
 
 function FirstPersonMovement({ disabled }: { disabled: boolean }) {
   const { camera, scene } = useThree()
   const keys = useRef<Record<string, boolean>>({})
   const raycaster = useRef(new THREE.Raycaster())
+  const velocityY = useRef(0)
+  const isGrounded = useRef(true)
 
   const onKeyDown = useCallback((e: KeyboardEvent) => {
     keys.current[e.code] = true
@@ -110,7 +114,22 @@ function FirstPersonMovement({ disabled }: { disabled: boolean }) {
       }
     }
 
-    camera.position.y = PLAYER_HEIGHT
+    // Jump
+    if (keys.current['Space'] && isGrounded.current) {
+      velocityY.current = JUMP_VELOCITY
+      isGrounded.current = false
+    }
+
+    // Apply gravity
+    velocityY.current += GRAVITY * delta
+    camera.position.y += velocityY.current * delta
+
+    // Land on ground
+    if (camera.position.y <= PLAYER_HEIGHT) {
+      camera.position.y = PLAYER_HEIGHT
+      velocityY.current = 0
+      isGrounded.current = true
+    }
   })
 
   return null
@@ -521,7 +540,7 @@ export default function ThreeScene({
       camera={{ position: [0, PLAYER_HEIGHT, 5], fov: 60 }}
       style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', zIndex: 0 }}
     >
-      <Environment files="/sky.hdr" background />
+      <Environment files="/sky.hdr" background environmentIntensity={0.3} />
       <ambientLight intensity={0.5} />
       <pointLight position={[10, 10, 10]} />
       <JsonControls disabled={panelOpen || selectionMode} />
