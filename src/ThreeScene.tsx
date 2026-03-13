@@ -25,7 +25,7 @@ const PLAYER_HEIGHT = 2
 const COLLISION_DISTANCE = 0.6
 const JUMP_VELOCITY = 6
 const GRAVITY = -15
-const STEP_HEIGHT = 0.25 // max height player can step up without jumping
+const STEP_HEIGHT = 0.5 // max height player can step up without jumping
 
 function FirstPersonMovement({ disabled }: { disabled: boolean }) {
   const { camera, scene } = useThree()
@@ -502,7 +502,7 @@ function SelectionModeControls({
     const box = new THREE.Box3().setFromObject(targetObject)
     const minY = box.min.y
     const offset = minY - GROUND_Y
-    targetObject.position.y -= offset
+    targetObject.position.y -= offset - 0.01
 
     // Report updated transform
     if (onTransformUpdate && selectedImageId != null) {
@@ -620,7 +620,7 @@ export default function ThreeScene({
       camera={{ position: [0, PLAYER_HEIGHT, 5], fov: 60 }}
       style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', zIndex: 0 }}
     >
-      <Environment files="/sky.hdr" background environmentIntensity={0.1} backgroundIntensity={0.3} />
+      <Environment files="/sky.hdr" background environmentIntensity={0.08} backgroundIntensity={0.25} />
       <ambientLight intensity={0.5} />
       <pointLight position={[10, 10, 10]} />
       <JsonControls disabled={panelOpen || selectionMode} />
