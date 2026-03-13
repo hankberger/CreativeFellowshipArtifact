@@ -243,9 +243,12 @@ app.all("/api/*", (req: Request, res: Response) => {
   res.status(404).json({ error: "Not found" });
 });
 
-// SPA catch-all: serve index.html for client-side routing
-app.get(/^(?!\/api|\/assets|\/images).+/, (req: Request, res: Response) => {
-  res.sendFile(path.join(__dirname, "..", "dist", "index.html"));
+// SPA catch-all: serve index.html only for navigation requests (no file extension)
+app.get("*", (req: Request, res: Response, next: Function) => {
+  if (path.extname(req.path)) {
+    return next();
+  }
+  res.sendFile(path.join(projectRoot, "dist", "index.html"));
 });
 
 // Final 404 fallback for anything else (e.g. missing static files)
