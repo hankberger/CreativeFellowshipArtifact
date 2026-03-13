@@ -19,8 +19,8 @@ interface AcceptedImage {
   scale?: [number, number, number];
 }
 
-const MOVE_SPEED = 5
-const SPRINT_MULTIPLIER = 2.5
+const MOVE_SPEED = 8
+const SPRINT_MULTIPLIER = 1.5625
 const PLAYER_HEIGHT = 2
 const COLLISION_DISTANCE = 0.6
 const JUMP_VELOCITY = 6
@@ -67,11 +67,23 @@ function FirstPersonMovement({ disabled }: { disabled: boolean }) {
   }, [scene])
 
   // Check if moving in a direction would collide
+  // Cast rays at multiple heights to detect rotated/tilted planes
   const canMove = useCallback((origin: THREE.Vector3, direction: THREE.Vector3, distance: number) => {
-    raycaster.current.set(origin, direction)
-    raycaster.current.far = distance + COLLISION_DISTANCE
-    const hits = raycaster.current.intersectObjects(getCollidables(), false)
-    return hits.length === 0 || hits[0].distance > distance + COLLISION_DISTANCE
+    const collidables = getCollidables()
+    const threshold = distance + COLLISION_DISTANCE
+    // Ray heights relative to feet (origin.y is camera/eye level = PLAYER_HEIGHT above ground)
+    const groundY = origin.y - PLAYER_HEIGHT
+    const rayHeights = [groundY + 0.2, groundY + PLAYER_HEIGHT * 0.5, groundY + PLAYER_HEIGHT * 0.85]
+    const testOrigin = new THREE.Vector3()
+
+    for (const h of rayHeights) {
+      testOrigin.set(origin.x, h, origin.z)
+      raycaster.current.set(testOrigin, direction)
+      raycaster.current.far = threshold
+      const hits = raycaster.current.intersectObjects(collidables, false)
+      if (hits.length > 0 && hits[0].distance <= threshold) return false
+    }
+    return true
   }, [getCollidables])
 
   useFrame((_, delta) => {
@@ -89,7 +101,7 @@ function FirstPersonMovement({ disabled }: { disabled: boolean }) {
     const speed = MOVE_SPEED * (sprinting ? SPRINT_MULTIPLIER : 1) * delta
 
     const origin = camera.position.clone()
-    origin.y = PLAYER_HEIGHT * 0.5 // raycast from mid-body height
+    // canMove casts rays at multiple heights from this base
 
     if (keys.current['KeyW'] || keys.current['ArrowUp']) {
       if (canMove(origin, forward, speed)) {
@@ -540,7 +552,7 @@ export default function ThreeScene({
       camera={{ position: [0, PLAYER_HEIGHT, 5], fov: 60 }}
       style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', zIndex: 0 }}
     >
-      <Environment files="/sky.hdr" background environmentIntensity={0.3} />
+      <Environment files="/sky.hdr" background environmentIntensity={0.15} backgroundIntensity={0.5} />
       <ambientLight intensity={0.5} />
       <pointLight position={[10, 10, 10]} />
       <JsonControls disabled={panelOpen || selectionMode} />
