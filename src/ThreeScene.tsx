@@ -331,11 +331,13 @@ function ImagePlane({
       camPos.y = groupRef.current.position.y
       groupRef.current.lookAt(camPos)
     }
-    // Chatbubble always faces camera (billboard) regardless of parent billboard setting
+    // Chatbubble always faces camera and bobs up/down
     if (character && chatBubbleRef.current) {
       const camPos = camera.position.clone()
       camPos.y = chatBubbleRef.current.getWorldPosition(new THREE.Vector3()).y
       chatBubbleRef.current.lookAt(camPos)
+      const baseY = planeSize[1] / 2 + 0.3
+      chatBubbleRef.current.position.y = baseY + Math.sin(performance.now() * 0.003) * 0.08
     }
   })
 
@@ -356,9 +358,9 @@ function ImagePlane({
         </>
       )}
       {character && chatBubbleTexture && (
-        <group ref={chatBubbleRef} position={[0, planeSize[1] / 2 + 0.5, 0]}>
+        <group ref={chatBubbleRef} position={[0, planeSize[1] / 2 + 0.3, 0]}>
           <mesh>
-            <planeGeometry args={[0.8, 0.8]} />
+            <planeGeometry args={[0.5, 0.5]} />
             <meshBasicMaterial map={chatBubbleTexture} transparent alphaTest={0.1} side={THREE.DoubleSide} />
           </mesh>
         </group>
