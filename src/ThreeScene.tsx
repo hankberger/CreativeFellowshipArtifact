@@ -235,6 +235,28 @@ function HoldToSelect({ disabled, onHoldStart, onHoldEnd }: { disabled: boolean;
   return null
 }
 
+function CameraStateSaver({ selectionMode }: { selectionMode: boolean }) {
+  const { camera } = useThree()
+  const savedState = useRef<{ position: THREE.Vector3; quaternion: THREE.Quaternion } | null>(null)
+  const prevSelectionMode = useRef(false)
+
+  useEffect(() => {
+    if (selectionMode && !prevSelectionMode.current) {
+      savedState.current = {
+        position: camera.position.clone(),
+        quaternion: camera.quaternion.clone(),
+      }
+    } else if (!selectionMode && prevSelectionMode.current && savedState.current) {
+      camera.position.copy(savedState.current.position)
+      camera.quaternion.copy(savedState.current.quaternion)
+      savedState.current = null
+    }
+    prevSelectionMode.current = selectionMode
+  }, [selectionMode, camera])
+
+  return null
+}
+
 function SelectionModeControls({
   selectedImageId,
   transformMode,
@@ -309,6 +331,12 @@ function SelectionModeControls({
           [targetObject.scale.x, targetObject.scale.y, targetObject.scale.z],
         )
       }
+      if (orbitRef.current && targetObject) {
+        const pos = new THREE.Vector3()
+        targetObject.getWorldPosition(pos)
+        orbitRef.current.target.copy(pos)
+        orbitRef.current.update()
+      }
     }
 
     ctrl.addEventListener('mouseUp', handleMouseUp)
@@ -363,6 +391,7 @@ export default function ThreeScene({
       <pointLight position={[10, 10, 10]} />
       <JsonControls disabled={panelOpen || selectionMode} />
       <FirstPersonMovement disabled={panelOpen || selectionMode} />
+      <CameraStateSaver selectionMode={selectionMode} />
       <HoldToSelect disabled={selectionMode} onHoldStart={onHoldStart} onHoldEnd={onHoldEnd} />
       {selectionMode && (
         <SelectionModeControls

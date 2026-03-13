@@ -131,6 +131,11 @@ function App() {
               scaleX: t.scale[0], scaleY: t.scale[1], scaleZ: t.scale[2],
             }),
           })
+          setAcceptedImages(prev => prev.map(img =>
+            img.id === selectedImageId
+              ? { ...img, position: t.position, rotation: t.rotation, scale: t.scale }
+              : img
+          ))
         } catch (err) {
           console.error('Failed to save transform', err)
         }
