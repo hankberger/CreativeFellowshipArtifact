@@ -32,6 +32,7 @@ function App() {
   const [selectionMode, setSelectionMode] = useState(false)
   const [transformMode, setTransformMode] = useState<'translate' | 'rotate' | 'scale'>('translate')
   const [snapToGroundTrigger, setSnapToGroundTrigger] = useState(0)
+  const [snapRotationTrigger, setSnapRotationTrigger] = useState<{ rotation: [number, number, number]; counter: number }>({ rotation: [0, 0, 0], counter: 0 })
   const [billboardIds, setBillboardIds] = useState<Set<number>>(new Set())
   const [gallerySearch, setGallerySearch] = useState('')
 
@@ -286,6 +287,7 @@ function App() {
         transformMode={transformMode}
         onTransformUpdate={handleTransformUpdate}
         snapToGroundTrigger={snapToGroundTrigger}
+        snapRotationTrigger={snapRotationTrigger}
         billboardIds={billboardIds}
       />
 
@@ -303,7 +305,7 @@ function App() {
             <textarea
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
-              placeholder="A crystalline dragon perched on obsidian towers..."
+              placeholder="A cartoon man with a tophat and a moustache"
               rows={4}
             />
             <div className="prompt-char-count">{prompt.length} chars</div>
@@ -459,6 +461,44 @@ function App() {
               }}
             >
               Billboard
+            </button>
+          </div>
+          <div className="snap-rotation-row">
+            <span className="snap-rotation-label">Snap</span>
+            <button
+              className="snap-rotation-btn"
+              onClick={() => setSnapRotationTrigger(prev => ({ rotation: [0, 0, 0], counter: prev.counter + 1 }))}
+              title="Face front (toward +Z)"
+            >
+              Front
+            </button>
+            <button
+              className="snap-rotation-btn"
+              onClick={() => setSnapRotationTrigger(prev => ({ rotation: [0, Math.PI, 0], counter: prev.counter + 1 }))}
+              title="Face back (toward -Z)"
+            >
+              Back
+            </button>
+            <button
+              className="snap-rotation-btn"
+              onClick={() => setSnapRotationTrigger(prev => ({ rotation: [0, Math.PI / 2, 0], counter: prev.counter + 1 }))}
+              title="Face left (toward +X)"
+            >
+              Left
+            </button>
+            <button
+              className="snap-rotation-btn"
+              onClick={() => setSnapRotationTrigger(prev => ({ rotation: [0, -Math.PI / 2, 0], counter: prev.counter + 1 }))}
+              title="Face right (toward -X)"
+            >
+              Right
+            </button>
+            <button
+              className="snap-rotation-btn"
+              onClick={() => setSnapRotationTrigger(prev => ({ rotation: [-Math.PI / 2, 0, 0], counter: prev.counter + 1 }))}
+              title="Face up (flat on ground)"
+            >
+              Flat
             </button>
           </div>
           <button className="accept-placement-btn" onClick={handleAcceptPlacement}>

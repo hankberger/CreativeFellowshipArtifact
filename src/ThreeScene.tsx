@@ -25,7 +25,7 @@ const PLAYER_HEIGHT = 2
 const COLLISION_DISTANCE = 0.6
 const JUMP_VELOCITY = 6
 const GRAVITY = -15
-const STEP_HEIGHT = 0.5 // max height player can step up without jumping
+const STEP_HEIGHT = 0.25 // max height player can step up without jumping
 
 function FirstPersonMovement({ disabled }: { disabled: boolean }) {
   const { camera, scene } = useThree()
@@ -435,11 +435,13 @@ function SelectionModeControls({
   transformMode,
   onTransformUpdate,
   snapToGroundTrigger,
+  snapRotationTrigger,
 }: {
   selectedImageId: number | null
   transformMode: 'translate' | 'rotate' | 'scale'
   onTransformUpdate?: (id: number, position: [number, number, number], rotation: [number, number, number], scale: [number, number, number]) => void
   snapToGroundTrigger: number
+  snapRotationTrigger: { rotation: [number, number, number]; counter: number }
 }) {
   const { scene, camera } = useThree()
   const orbitRef = useRef<OrbitControlsImpl>(null!)
@@ -521,6 +523,27 @@ function SelectionModeControls({
     }
   }, [snapToGroundTrigger])
 
+  // Snap rotation when trigger changes
+  useEffect(() => {
+    if (snapRotationTrigger.counter === 0 || !targetObject || selectedImageId == null) return
+
+    const [rx, ry, rz] = snapRotationTrigger.rotation
+    targetObject.rotation.set(rx, ry, rz)
+
+    if (onTransformUpdate) {
+      onTransformUpdate(
+        selectedImageId,
+        [targetObject.position.x, targetObject.position.y, targetObject.position.z],
+        [rx, ry, rz],
+        [targetObject.scale.x, targetObject.scale.y, targetObject.scale.z],
+      )
+    }
+
+    if (orbitRef.current) {
+      orbitRef.current.update()
+    }
+  }, [snapRotationTrigger])
+
   // Listen for drag-end on TransformControls to report updated transform
   useEffect(() => {
     const ctrl = transformRef.current
@@ -575,6 +598,7 @@ interface ThreeSceneProps {
   transformMode: 'translate' | 'rotate' | 'scale'
   onTransformUpdate: (id: number, position: [number, number, number], rotation: [number, number, number], scale: [number, number, number]) => void
   snapToGroundTrigger: number
+  snapRotationTrigger: { rotation: [number, number, number]; counter: number }
   billboardIds: Set<number>
 }
 
@@ -588,6 +612,7 @@ export default function ThreeScene({
   transformMode,
   onTransformUpdate,
   snapToGroundTrigger,
+  snapRotationTrigger,
   billboardIds,
 }: ThreeSceneProps) {
   return (
@@ -595,7 +620,7 @@ export default function ThreeScene({
       camera={{ position: [0, PLAYER_HEIGHT, 5], fov: 60 }}
       style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', zIndex: 0 }}
     >
-      <Environment files="/sky.hdr" background environmentIntensity={0.15} backgroundIntensity={0.5} />
+      <Environment files="/sky.hdr" background environmentIntensity={0.1} backgroundIntensity={0.3} />
       <ambientLight intensity={0.5} />
       <pointLight position={[10, 10, 10]} />
       <JsonControls disabled={panelOpen || selectionMode} />
@@ -608,6 +633,7 @@ export default function ThreeScene({
           transformMode={transformMode}
           onTransformUpdate={onTransformUpdate}
           snapToGroundTrigger={snapToGroundTrigger}
+          snapRotationTrigger={snapRotationTrigger}
         />
       )}
       {acceptedImages.map((img) => (

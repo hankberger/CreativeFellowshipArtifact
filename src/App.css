@@ -953,6 +953,41 @@
   box-shadow: 0 0 16px rgba(92, 224, 216, 0.12);
 }
 
+.snap-rotation-row {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.snap-rotation-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--forge-text-dim);
+  margin-right: 0.15rem;
+}
+
+.snap-rotation-btn {
+  background: var(--forge-surface);
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--forge-border);
+  color: var(--forge-text-dim);
+  padding: 0.3rem 0.55rem;
+  border-radius: 6px;
+  font-size: 0.7rem;
+  cursor: pointer;
+  transition: all 0.25s;
+}
+
+.snap-rotation-btn:hover {
+  border-color: var(--forge-border-hover);
+  color: var(--forge-text);
+}
+
+.snap-rotation-btn:active {
+  transform: scale(0.95);
+}
+
 .accept-placement-btn {
   background: transparent;
   border: 1px solid var(--forge-cyan);
