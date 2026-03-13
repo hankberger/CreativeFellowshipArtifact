@@ -235,7 +235,7 @@ app.delete(
   },
 );
 
-app.get(/^(?!\/api).+/, (req: Request, res: Response) => {
+app.get(/^(?!\/api|\/assets|\/images).+/, (req: Request, res: Response) => {
   res.sendFile(path.join(__dirname, "..", "dist", "index.html"));
 });
 
