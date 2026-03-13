@@ -12,8 +12,11 @@ import { Jimp, rgbaToInt } from "jimp";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Resolve project root: when compiled (dist-server/), go up one level; otherwise use __dirname directly
+const projectRoot = __dirname.endsWith("dist-server") ? path.join(__dirname, "..") : __dirname;
+
 // Persistent data directory at project root (survives rebuilds/redeploys)
-const dataDir = path.join(__dirname, "..", "data");
+const dataDir = path.join(projectRoot, "data");
 if (!fs.existsSync(dataDir)) {
   fs.mkdirSync(dataDir, { recursive: true });
 }
@@ -53,8 +56,8 @@ const port = process.env.PORT || 3000;
 
 app.use(express.json());
 // When compiled, this file will be in dist-server/, so we go up one directory to find dist/
-app.use(express.static(path.join(__dirname, "..", "dist")));
-app.use("/images", express.static(path.join(__dirname, "..", "data", "images")));
+app.use(express.static(path.join(projectRoot, "dist")));
+app.use("/images", express.static(path.join(projectRoot, "data", "images")));
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
@@ -235,8 +238,19 @@ app.delete(
   },
 );
 
+// 404 for any unmatched API routes
+app.all("/api/*", (req: Request, res: Response) => {
+  res.status(404).json({ error: "Not found" });
+});
+
+// SPA catch-all: serve index.html for client-side routing
 app.get(/^(?!\/api|\/assets|\/images).+/, (req: Request, res: Response) => {
   res.sendFile(path.join(__dirname, "..", "dist", "index.html"));
+});
+
+// Final 404 fallback for anything else (e.g. missing static files)
+app.use((req: Request, res: Response) => {
+  res.status(404).json({ error: "Not found" });
 });
 
 app.listen(port, () => {
