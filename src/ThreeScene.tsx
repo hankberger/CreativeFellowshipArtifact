@@ -180,7 +180,7 @@ function ImagePlane({
 }
 
 function HoldToSelect({ disabled, onHoldStart, onHoldEnd }: { disabled: boolean; onHoldStart: (id: number) => void; onHoldEnd: () => void }) {
-  const { camera, scene, gl } = useThree()
+  const { camera, scene } = useThree()
   const holdingRef = useRef<number | null>(null)
   const raycasterRef = useRef(new THREE.Raycaster())
   const disabledRef = useRef(disabled)
