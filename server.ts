@@ -7,7 +7,7 @@ import { v4 as uuidv4 } from "uuid";
 import * as fs from "fs";
 import sqlite3 from "sqlite3";
 import { open } from "sqlite";
-import { Jimp, rgbaToInt } from "jimp";
+import sharp from "sharp";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -123,36 +123,36 @@ app.post(
         const filePath = path.join(imagesDir, filename);
         const buffer = Buffer.from(base64Image, "base64");
 
-        // Process image with Jimp to make white background transparent
-        const image = await Jimp.read(buffer);
+        // Process image with sharp to make green background transparent
+        const { data, info } = await sharp(buffer)
+          .ensureAlpha()
+          .raw()
+          .toBuffer({ resolveWithObject: true });
 
-        image.scan(
-          0,
-          0,
-          image.bitmap.width,
-          image.bitmap.height,
-          function (this: any, x, y, idx) {
-            const r = this.bitmap.data[idx + 0];
-            const g = this.bitmap.data[idx + 1];
-            const b = this.bitmap.data[idx + 2];
+        for (let i = 0; i < data.length; i += 4) {
+          const r = data[i];
+          const g = data[i + 1];
+          const b = data[i + 2];
 
-            // Chroma key removal: detect green background pixels
-            // "greenness" = how much greener the pixel is than red/blue
-            const greenness = g - Math.max(r, b);
+          // Chroma key removal: detect green background pixels
+          // "greenness" = how much greener the pixel is than red/blue
+          const greenness = g - Math.max(r, b);
 
-            if (greenness > 30) {
-              // Strong green — fully transparent
-              this.bitmap.data[idx + 3] = 0;
-            } else if (greenness > 0 && g > 100) {
-              // Edge feathering: semi-transparent for pixels with mild green tint
-              // Smoothly fade alpha from 255 down to 0 across the greenness range 0–30
-              const alpha = Math.round(255 * (1 - greenness / 30));
-              this.bitmap.data[idx + 3] = alpha;
-            }
-          },
-        );
+          if (greenness > 30) {
+            // Strong green — fully transparent
+            data[i + 3] = 0;
+          } else if (greenness > 0 && g > 100) {
+            // Edge feathering: semi-transparent for pixels with mild green tint
+            const alpha = Math.round(255 * (1 - greenness / 30));
+            data[i + 3] = alpha;
+          }
+        }
 
-        const modifiedBuffer = await image.getBuffer("image/webp");
+        const modifiedBuffer = await sharp(data, {
+          raw: { width: info.width, height: info.height, channels: 4 },
+        })
+          .webp({ quality: 80 })
+          .toBuffer();
         fs.writeFileSync(filePath, modifiedBuffer);
 
         await db.run("INSERT INTO images (id, prompt) VALUES (?, ?)", [id, prompt]);
@@ -179,7 +179,7 @@ app.get("/api/scene-objects", async (req: Request, res: Response) => {
     const objects = rows.map((r: any) => ({
       id: r.id,
       imageId: r.image_id,
-      url: `/images/${r.image_id}.png`,
+      url: `/images/${r.image_id}.webp`,
       position: [r.position_x, r.position_y, r.position_z],
       rotation: [r.rotation_x, r.rotation_y, r.rotation_z],
       scale: [r.scale_x, r.scale_y, r.scale_z],
