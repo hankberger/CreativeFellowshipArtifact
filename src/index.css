@@ -1,11 +1,26 @@
 :root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-family: 'DM Mono', 'Courier New', monospace;
   line-height: 1.5;
   font-weight: 400;
 
+  /* Ethereal Forge palette */
+  --forge-gold: #e8a849;
+  --forge-amber: #d4912a;
+  --forge-ember: #c27820;
+  --forge-cyan: #5ce0d8;
+  --forge-surface: rgba(12, 11, 15, 0.92);
+  --forge-surface-light: rgba(30, 28, 36, 0.85);
+  --forge-border: rgba(232, 168, 73, 0.18);
+  --forge-border-hover: rgba(232, 168, 73, 0.45);
+  --forge-text: rgba(255, 248, 235, 0.87);
+  --forge-text-dim: rgba(255, 248, 235, 0.45);
+  --forge-text-muted: rgba(255, 248, 235, 0.28);
+  --forge-glow: rgba(232, 168, 73, 0.15);
+  --forge-glow-strong: rgba(232, 168, 73, 0.35);
+
   color-scheme: dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #0a0a0a;
+  color: var(--forge-text);
+  background-color: #0a090d;
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;

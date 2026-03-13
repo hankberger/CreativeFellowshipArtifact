@@ -101,11 +101,56 @@ function ImagePlane({
   const groupRef = useRef<THREE.Group>(null!)
   const { camera } = useThree()
   const [texture, setTexture] = useState<THREE.Texture | null>(null)
+  const [planeSize, setPlaneSize] = useState<[number, number]>([2, 2])
   const initialized = useRef(false)
 
   useEffect(() => {
     const loader = new THREE.TextureLoader()
     loader.load(url, (tex) => {
+      // Analyze texture to find non-transparent content bounds
+      const image = tex.image as HTMLImageElement
+      const canvas = document.createElement('canvas')
+      canvas.width = image.naturalWidth || image.width
+      canvas.height = image.naturalHeight || image.height
+      const ctx = canvas.getContext('2d')!
+      ctx.drawImage(image, 0, 0)
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+      const { data, width, height } = imageData
+
+      let minX = width, minY = height, maxX = 0, maxY = 0
+      for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+          const alpha = data[(y * width + x) * 4 + 3]
+          if (alpha > 10) {
+            if (x < minX) minX = x
+            if (x > maxX) maxX = x
+            if (y < minY) minY = y
+            if (y > maxY) maxY = y
+          }
+        }
+      }
+
+      if (maxX >= minX && maxY >= minY) {
+        // Set UV offset/repeat to crop to non-transparent region
+        const uMin = minX / width
+        const uMax = (maxX + 1) / width
+        const vMin = 1 - (maxY + 1) / height  // UV y is flipped
+        const vMax = 1 - minY / height
+        tex.offset.set(uMin, vMin)
+        tex.repeat.set(uMax - uMin, vMax - vMin)
+
+        // Scale plane to match cropped aspect ratio, fitting within 2 units
+        const contentW = maxX - minX + 1
+        const contentH = maxY - minY + 1
+        const aspect = contentW / contentH
+        const targetSize = 2
+        if (aspect >= 1) {
+          setPlaneSize([targetSize, targetSize / aspect])
+        } else {
+          setPlaneSize([targetSize * aspect, targetSize])
+        }
+      }
+
       setTexture(tex)
     })
   }, [url])
@@ -164,13 +209,13 @@ function ImagePlane({
       {texture && (
         <>
           <mesh>
-            <planeGeometry args={[2, 2]} />
+            <planeGeometry args={planeSize} />
             <meshStandardMaterial map={texture} transparent alphaTest={0.1} depthWrite={false} side={THREE.DoubleSide} />
           </mesh>
           {selected && (
             <mesh position={[0, 0, -0.01]}>
-              <planeGeometry args={[2.15, 2.15]} />
-              <meshBasicMaterial color="#f97316" side={THREE.DoubleSide} transparent opacity={0.7} />
+              <planeGeometry args={[planeSize[0] + 0.15, planeSize[1] + 0.15]} />
+              <meshBasicMaterial color="#ffffff" side={THREE.DoubleSide} transparent opacity={0.7} />
             </mesh>
           )}
         </>

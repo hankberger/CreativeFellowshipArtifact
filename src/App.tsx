@@ -33,6 +33,7 @@ function App() {
   const [transformMode, setTransformMode] = useState<'translate' | 'rotate' | 'scale'>('translate')
   const [snapToGroundTrigger, setSnapToGroundTrigger] = useState(0)
   const [billboardIds, setBillboardIds] = useState<Set<number>>(new Set())
+  const [gallerySearch, setGallerySearch] = useState('')
 
   // Hold-to-select state
   const [holdTarget, setHoldTarget] = useState<number | null>(null)
@@ -240,13 +241,13 @@ function App() {
               <circle
                 cx="22" cy="22" r="18"
                 fill="none"
-                stroke="rgba(249, 115, 22, 0.3)"
+                stroke="rgba(255, 255, 255, 0.3)"
                 strokeWidth="3"
               />
               <circle
                 cx="22" cy="22" r="18"
                 fill="none"
-                stroke="#f97316"
+                stroke="#ffffff"
                 strokeWidth="3"
                 strokeDasharray={circumference}
                 strokeDashoffset={circumference * (1 - holdProgress)}
@@ -273,25 +274,27 @@ function App() {
       {panelOpen && (
         <div className="floating-panel">
           <div className="panel-header">
-            <h1>Gemini Image Generator</h1>
+            <h1><span className="panel-header-badge">Image Forge</span></h1>
             <button className="panel-close" onClick={() => setPanelOpen(false)}>
               &times;
             </button>
           </div>
 
           <form onSubmit={handleSubmit} className="panel-form">
+            <div className="panel-form-label">Describe your creation</div>
             <textarea
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
-              placeholder="Enter a prompt to generate an image..."
+              placeholder="A crystalline dragon perched on obsidian towers..."
               rows={4}
             />
+            <div className="prompt-char-count">{prompt.length} chars</div>
             <button
               type="submit"
               disabled={loading || !prompt.trim()}
               className="generate-btn"
             >
-              {loading ? 'Generating...' : 'Generate Image'}
+              <span className="generate-btn-text">{loading ? 'Forging...' : 'Materialize'}</span>
             </button>
           </form>
 
@@ -321,11 +324,11 @@ function App() {
 
           {imageUrl && (
             <div className="panel-result">
-              <h2>Generated Image:</h2>
+              <h2>Materialized</h2>
               <img src={imageUrl} alt="Generated" />
               <div className="result-actions">
                 <button className="accept-btn" onClick={handleAccept}>
-                  Accept
+                  Place in World
                 </button>
                 <button
                   className="recycle-btn"
@@ -335,7 +338,7 @@ function App() {
                     handleSubmit(fakeEvent)
                   }}
                 >
-                  {loading ? 'Generating...' : '♻ Regenerate'}
+                  {loading ? 'Forging...' : 'Reforge'}
                 </button>
               </div>
             </div>
@@ -343,10 +346,45 @@ function App() {
 
           {gallery.length > 0 && (
             <div className="panel-gallery">
-              <h2>Gallery</h2>
+              <div className="panel-gallery-header">
+                <h2>Archive</h2>
+                <span className="gallery-count">{gallery.length} artifact{gallery.length !== 1 ? 's' : ''}</span>
+              </div>
+              <input
+                type="text"
+                className="gallery-search"
+                placeholder="Search artifacts..."
+                value={gallerySearch}
+                onChange={(e) => setGallerySearch(e.target.value)}
+              />
               <div className="gallery-grid">
-                {gallery.map((img) => (
-                  <div key={img.id} className="gallery-item">
+                {gallery.filter((img) => {
+                  if (!gallerySearch.trim()) return true
+                  const title = (img.prompt || 'Untitled').toLowerCase()
+                  return title.includes(gallerySearch.trim().toLowerCase())
+                }).map((img) => (
+                  <div
+                    key={img.id}
+                    className="gallery-item gallery-item-clickable"
+                    onClick={async () => {
+                      try {
+                        const res = await fetch('/api/scene-objects', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ imageId: img.id }),
+                        })
+                        const { id } = await res.json()
+                        const url = `/images/${img.id}.png`
+                        setAcceptedImages(prev => [...prev, { id, imageId: img.id, url }])
+                        setPanelOpen(false)
+                        setSelectedImageId(id)
+                        setSelectionMode(true)
+                        setTransformMode('translate')
+                      } catch (err) {
+                        console.error('Failed to add gallery image to scene', err)
+                      }
+                    }}
+                  >
                     <img
                       src={`/images/${img.id}.png`}
                       alt={img.prompt || `Generated at ${img.created_at}`}
@@ -417,10 +455,25 @@ function App() {
       {!selectionMode && (
         <div className="controls-guide">
           <div className="controls-guide-title">Controls</div>
-          <div className="controls-guide-row"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Move</div>
-          <div className="controls-guide-row"><kbd>Mouse</kbd> Look</div>
-          <div className="controls-guide-row"><kbd>Hold Click</kbd> to select object</div>
-          <div className="controls-guide-row controls-guide-action"><kbd className="kbd-highlight">E</kbd> Generate Image</div>
+          <div className="controls-guide-body">
+            <div className="controls-guide-row">
+              <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>
+              <span className="controls-guide-row-label">Move</span>
+            </div>
+            <div className="controls-guide-row">
+              <kbd>Mouse</kbd>
+              <span className="controls-guide-row-label">Look</span>
+            </div>
+            <div className="controls-guide-row">
+              <kbd>Hold Click</kbd>
+              <span className="controls-guide-row-label">Select object</span>
+            </div>
+            <div className="controls-guide-divider" />
+            <div className="controls-guide-row controls-guide-action">
+              <kbd className="kbd-highlight">E</kbd>
+              <span className="controls-guide-row-label">Open Forge</span>
+            </div>
+          </div>
         </div>
       )}
     </>
