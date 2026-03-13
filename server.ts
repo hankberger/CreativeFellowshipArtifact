@@ -12,11 +12,21 @@ import { Jimp, rgbaToInt } from "jimp";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Persistent data directory at project root (survives rebuilds/redeploys)
+const dataDir = path.join(__dirname, "..", "data");
+if (!fs.existsSync(dataDir)) {
+  fs.mkdirSync(dataDir, { recursive: true });
+}
+const imagesDir = path.join(dataDir, "images");
+if (!fs.existsSync(imagesDir)) {
+  fs.mkdirSync(imagesDir, { recursive: true });
+}
+
 // Initialize SQLite database
 let db: any;
 (async () => {
   db = await open({
-    filename: "./database.sqlite",
+    filename: path.join(dataDir, "database.sqlite"),
     driver: sqlite3.Database,
   });
   await db.exec(
@@ -43,7 +53,8 @@ const port = process.env.PORT || 3000;
 
 app.use(express.json());
 // When compiled, this file will be in dist-server/, so we go up one directory to find dist/
-app.use(express.static(path.join(__dirname, "dist")));
+app.use(express.static(path.join(__dirname, "..", "dist")));
+app.use("/images", express.static(path.join(__dirname, "..", "data", "images")));
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
@@ -93,12 +104,6 @@ app.post(
       if (base64Image) {
         const id = uuidv4();
         const filename = `${id}.png`;
-        const imagesDir = path.join(__dirname, "dist", "images");
-
-        if (!fs.existsSync(imagesDir)) {
-          fs.mkdirSync(imagesDir, { recursive: true });
-        }
-
         const filePath = path.join(imagesDir, filename);
         const buffer = Buffer.from(base64Image, "base64");
 
