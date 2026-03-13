@@ -16,6 +16,7 @@ interface AcceptedImage {
   rotation?: [number, number, number];
   scale?: [number, number, number];
   billboard?: boolean;
+  character?: boolean;
 }
 
 const HOLD_DURATION = 2000
@@ -34,6 +35,7 @@ function App() {
   const [snapToGroundTrigger, setSnapToGroundTrigger] = useState(0)
   const [snapRotationTrigger, setSnapRotationTrigger] = useState<{ rotation: [number, number, number]; counter: number }>({ rotation: [0, 0, 0], counter: 0 })
   const [billboardIds, setBillboardIds] = useState<Set<number>>(new Set())
+  const [characterIds, setCharacterIds] = useState<Set<number>>(new Set())
   const [gallerySearch, setGallerySearch] = useState('')
 
   // Hold-to-select state
@@ -57,6 +59,7 @@ function App() {
           const data = await res.json()
           setAcceptedImages(data)
           setBillboardIds(new Set(data.filter((d: AcceptedImage) => d.billboard).map((d: AcceptedImage) => d.id)))
+          setCharacterIds(new Set(data.filter((d: AcceptedImage) => d.character).map((d: AcceptedImage) => d.id)))
         }
       } catch (err) {
         console.error('Failed to load scene objects', err)
@@ -137,12 +140,14 @@ function App() {
               rotationX: t.rotation[0], rotationY: t.rotation[1], rotationZ: t.rotation[2],
               scaleX: t.scale[0], scaleY: t.scale[1], scaleZ: t.scale[2],
               billboard: billboardIds.has(selectedImageId),
+              character: characterIds.has(selectedImageId),
             }),
           })
           const isBillboard = billboardIds.has(selectedImageId)
+          const isCharacter = characterIds.has(selectedImageId)
           setAcceptedImages(prev => prev.map(img =>
             img.id === selectedImageId
-              ? { ...img, position: t.position, rotation: t.rotation, scale: t.scale, billboard: isBillboard }
+              ? { ...img, position: t.position, rotation: t.rotation, scale: t.scale, billboard: isBillboard, character: isCharacter }
               : img
           ))
         } catch (err) {
@@ -152,7 +157,7 @@ function App() {
     }
     setSelectionMode(false)
     setSelectedImageId(null)
-  }, [selectedImageId, billboardIds])
+  }, [selectedImageId, billboardIds, characterIds])
 
   const handleRemoveObject = useCallback(async () => {
     if (selectedImageId == null) return
@@ -160,6 +165,11 @@ function App() {
       await fetch(`/api/scene-objects/${selectedImageId}`, { method: 'DELETE' })
       setAcceptedImages(prev => prev.filter(img => img.id !== selectedImageId))
       setBillboardIds(prev => {
+        const next = new Set(prev)
+        next.delete(selectedImageId!)
+        return next
+      })
+      setCharacterIds(prev => {
         const next = new Set(prev)
         next.delete(selectedImageId!)
         return next
@@ -289,6 +299,7 @@ function App() {
         snapToGroundTrigger={snapToGroundTrigger}
         snapRotationTrigger={snapRotationTrigger}
         billboardIds={billboardIds}
+        characterIds={characterIds}
       />
 
       {panelOpen && (
@@ -461,6 +472,20 @@ function App() {
               }}
             >
               Billboard
+            </button>
+            <button
+              className={`billboard-btn ${selectedImageId != null && characterIds.has(selectedImageId) ? 'active' : ''}`}
+              onClick={() => {
+                if (selectedImageId == null) return
+                setCharacterIds(prev => {
+                  const next = new Set(prev)
+                  if (next.has(selectedImageId)) next.delete(selectedImageId)
+                  else next.add(selectedImageId)
+                  return next
+                })
+              }}
+            >
+              Character
             </button>
           </div>
           <div className="snap-rotation-row">

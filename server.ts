@@ -48,6 +48,7 @@ let db: any;
     scale_y REAL DEFAULT 1,
     scale_z REAL DEFAULT 1,
     billboard INTEGER DEFAULT 0,
+    character INTEGER DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )`);
 
@@ -55,6 +56,11 @@ let db: any;
   const cols = await db.all("PRAGMA table_info(scene_objects)");
   if (!cols.some((c: any) => c.name === 'billboard')) {
     await db.exec("ALTER TABLE scene_objects ADD COLUMN billboard INTEGER DEFAULT 0");
+  }
+
+  // Migration: add character column if missing
+  if (!cols.some((c: any) => c.name === 'character')) {
+    await db.exec("ALTER TABLE scene_objects ADD COLUMN character INTEGER DEFAULT 0");
   }
 
   // Migration: add prompt column to images if missing
@@ -174,7 +180,7 @@ app.post(
 app.get("/api/scene-objects", async (req: Request, res: Response) => {
   try {
     const rows = await db.all(
-      "SELECT id, image_id, position_x, position_y, position_z, rotation_x, rotation_y, rotation_z, scale_x, scale_y, scale_z, billboard FROM scene_objects ORDER BY created_at ASC",
+      "SELECT id, image_id, position_x, position_y, position_z, rotation_x, rotation_y, rotation_z, scale_x, scale_y, scale_z, billboard, character FROM scene_objects ORDER BY created_at ASC",
     );
     const objects = rows.map((r: any) => ({
       id: r.id,
@@ -184,6 +190,7 @@ app.get("/api/scene-objects", async (req: Request, res: Response) => {
       rotation: [r.rotation_x, r.rotation_y, r.rotation_z],
       scale: [r.scale_x, r.scale_y, r.scale_z],
       billboard: !!r.billboard,
+      character: !!r.character,
     }));
     res.json(objects);
   } catch (error) {
@@ -222,15 +229,17 @@ app.put(
         rotationX, rotationY, rotationZ,
         scaleX, scaleY, scaleZ,
         billboard,
+        character,
       } = req.body;
       await db.run(
         `UPDATE scene_objects SET
           position_x = ?, position_y = ?, position_z = ?,
           rotation_x = ?, rotation_y = ?, rotation_z = ?,
           scale_x = ?, scale_y = ?, scale_z = ?,
-          billboard = ?
+          billboard = ?,
+          character = ?
         WHERE id = ?`,
-        [positionX, positionY, positionZ, rotationX, rotationY, rotationZ, scaleX, scaleY, scaleZ, billboard ? 1 : 0, id],
+        [positionX, positionY, positionZ, rotationX, rotationY, rotationZ, scaleX, scaleY, scaleZ, billboard ? 1 : 0, character ? 1 : 0, id],
       );
       res.json({ ok: true });
     } catch (error) {

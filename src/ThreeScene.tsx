@@ -205,7 +205,7 @@ function JsonControls({ disabled }: { disabled: boolean }) {
 function ImagePlane({
   url, id, selected,
   savedPosition, savedRotation, savedScale,
-  onTransformUpdate, billboard,
+  onTransformUpdate, billboard, character,
 }: {
   url: string; id: number; selected: boolean;
   savedPosition?: [number, number, number];
@@ -213,12 +213,25 @@ function ImagePlane({
   savedScale?: [number, number, number];
   onTransformUpdate?: (id: number, position: [number, number, number], rotation: [number, number, number], scale: [number, number, number]) => void;
   billboard?: boolean;
+  character?: boolean;
 }) {
   const groupRef = useRef<THREE.Group>(null!)
+  const chatBubbleRef = useRef<THREE.Group>(null!)
   const { camera } = useThree()
   const [texture, setTexture] = useState<THREE.Texture | null>(null)
+  const [chatBubbleTexture, setChatBubbleTexture] = useState<THREE.Texture | null>(null)
   const [planeSize, setPlaneSize] = useState<[number, number]>([2, 2])
   const initialized = useRef(false)
+
+  // Load chatbubble texture when character flag is set
+  useEffect(() => {
+    if (character && !chatBubbleTexture) {
+      const loader = new THREE.TextureLoader()
+      loader.load('/chatbubble.png', (tex) => {
+        setChatBubbleTexture(tex)
+      })
+    }
+  }, [character, chatBubbleTexture])
 
   useEffect(() => {
     const loader = new THREE.TextureLoader()
@@ -318,6 +331,12 @@ function ImagePlane({
       camPos.y = groupRef.current.position.y
       groupRef.current.lookAt(camPos)
     }
+    // Chatbubble always faces camera (billboard) regardless of parent billboard setting
+    if (character && chatBubbleRef.current) {
+      const camPos = camera.position.clone()
+      camPos.y = chatBubbleRef.current.getWorldPosition(new THREE.Vector3()).y
+      chatBubbleRef.current.lookAt(camPos)
+    }
   })
 
   return (
@@ -335,6 +354,14 @@ function ImagePlane({
             </mesh>
           )}
         </>
+      )}
+      {character && chatBubbleTexture && (
+        <group ref={chatBubbleRef} position={[0, planeSize[1] / 2 + 0.5, 0]}>
+          <mesh>
+            <planeGeometry args={[0.8, 0.8]} />
+            <meshBasicMaterial map={chatBubbleTexture} transparent alphaTest={0.1} side={THREE.DoubleSide} />
+          </mesh>
+        </group>
       )}
     </group>
   )
@@ -600,6 +627,7 @@ interface ThreeSceneProps {
   snapToGroundTrigger: number
   snapRotationTrigger: { rotation: [number, number, number]; counter: number }
   billboardIds: Set<number>
+  characterIds: Set<number>
 }
 
 export default function ThreeScene({
@@ -614,6 +642,7 @@ export default function ThreeScene({
   snapToGroundTrigger,
   snapRotationTrigger,
   billboardIds,
+  characterIds,
 }: ThreeSceneProps) {
   return (
     <Canvas
@@ -647,6 +676,7 @@ export default function ThreeScene({
           savedScale={img.scale}
           onTransformUpdate={onTransformUpdate}
           billboard={billboardIds.has(img.id)}
+          character={characterIds.has(img.id)}
         />
       ))}
       <Grid
