@@ -89,13 +89,14 @@ function JsonControls({ disabled }: { disabled: boolean }) {
 function ImagePlane({
   url, id, selected,
   savedPosition, savedRotation, savedScale,
-  onTransformUpdate,
+  onTransformUpdate, billboard,
 }: {
   url: string; id: number; selected: boolean;
   savedPosition?: [number, number, number];
   savedRotation?: [number, number, number];
   savedScale?: [number, number, number];
   onTransformUpdate?: (id: number, position: [number, number, number], rotation: [number, number, number], scale: [number, number, number]) => void;
+  billboard?: boolean;
 }) {
   const groupRef = useRef<THREE.Group>(null!)
   const { camera } = useThree()
@@ -149,6 +150,15 @@ function ImagePlane({
     }
   }, [texture, camera, savedPosition, savedRotation, savedScale, id, onTransformUpdate])
 
+  // Billboard: always face the camera
+  useFrame(() => {
+    if (billboard && groupRef.current && !selected) {
+      const camPos = camera.position.clone()
+      camPos.y = groupRef.current.position.y
+      groupRef.current.lookAt(camPos)
+    }
+  })
+
   return (
     <group ref={groupRef} userData={{ imageId: id }}>
       {texture && (
@@ -160,7 +170,7 @@ function ImagePlane({
           {selected && (
             <mesh position={[0, 0, -0.01]}>
               <planeGeometry args={[2.15, 2.15]} />
-              <meshBasicMaterial color="#646cff" side={THREE.DoubleSide} transparent opacity={0.7} />
+              <meshBasicMaterial color="#f97316" side={THREE.DoubleSide} transparent opacity={0.7} />
             </mesh>
           )}
         </>
@@ -208,13 +218,13 @@ function HoldToSelect({ disabled, onHoldStart, onHoldEnd }: { disabled: boolean;
       }
     }
 
-    gl.domElement.addEventListener('mousedown', handleMouseDown)
-    window.addEventListener('mouseup', handleMouseUp)
+    document.addEventListener('mousedown', handleMouseDown)
+    document.addEventListener('mouseup', handleMouseUp)
     return () => {
-      gl.domElement.removeEventListener('mousedown', handleMouseDown)
-      window.removeEventListener('mouseup', handleMouseUp)
+      document.removeEventListener('mousedown', handleMouseDown)
+      document.removeEventListener('mouseup', handleMouseUp)
     }
-  }, [gl, getHitImageId, onHoldStart, onHoldEnd])
+  }, [getHitImageId, onHoldStart, onHoldEnd])
 
   // Cancel hold if disabled or crosshair moves off target
   useFrame(() => {
@@ -257,14 +267,18 @@ function CameraStateSaver({ selectionMode }: { selectionMode: boolean }) {
   return null
 }
 
+const GROUND_Y = -1
+
 function SelectionModeControls({
   selectedImageId,
   transformMode,
   onTransformUpdate,
+  snapToGroundTrigger,
 }: {
   selectedImageId: number | null
   transformMode: 'translate' | 'rotate' | 'scale'
   onTransformUpdate?: (id: number, position: [number, number, number], rotation: [number, number, number], scale: [number, number, number]) => void
+  snapToGroundTrigger: number
 }) {
   const { scene, camera } = useThree()
   const orbitRef = useRef<OrbitControlsImpl>(null!)
@@ -316,6 +330,35 @@ function SelectionModeControls({
 
     orbitRef.current.update()
   }, [targetObject, camera])
+
+  // Snap to ground when trigger changes
+  useEffect(() => {
+    if (snapToGroundTrigger === 0 || !targetObject) return
+
+    // Compute the world-space bounding box of the object
+    const box = new THREE.Box3().setFromObject(targetObject)
+    const minY = box.min.y
+    const offset = minY - GROUND_Y
+    targetObject.position.y -= offset
+
+    // Report updated transform
+    if (onTransformUpdate && selectedImageId != null) {
+      onTransformUpdate(
+        selectedImageId,
+        [targetObject.position.x, targetObject.position.y, targetObject.position.z],
+        [targetObject.rotation.x, targetObject.rotation.y, targetObject.rotation.z],
+        [targetObject.scale.x, targetObject.scale.y, targetObject.scale.z],
+      )
+    }
+
+    // Update orbit target
+    if (orbitRef.current) {
+      const pos = new THREE.Vector3()
+      targetObject.getWorldPosition(pos)
+      orbitRef.current.target.copy(pos)
+      orbitRef.current.update()
+    }
+  }, [snapToGroundTrigger])
 
   // Listen for drag-end on TransformControls to report updated transform
   useEffect(() => {
@@ -370,6 +413,8 @@ interface ThreeSceneProps {
   onHoldEnd: () => void
   transformMode: 'translate' | 'rotate' | 'scale'
   onTransformUpdate: (id: number, position: [number, number, number], rotation: [number, number, number], scale: [number, number, number]) => void
+  snapToGroundTrigger: number
+  billboardIds: Set<number>
 }
 
 export default function ThreeScene({
@@ -381,6 +426,8 @@ export default function ThreeScene({
   onHoldEnd,
   transformMode,
   onTransformUpdate,
+  snapToGroundTrigger,
+  billboardIds,
 }: ThreeSceneProps) {
   return (
     <Canvas
@@ -398,6 +445,7 @@ export default function ThreeScene({
           selectedImageId={selectedImageId}
           transformMode={transformMode}
           onTransformUpdate={onTransformUpdate}
+          snapToGroundTrigger={snapToGroundTrigger}
         />
       )}
       {acceptedImages.map((img) => (
@@ -410,6 +458,7 @@ export default function ThreeScene({
           savedRotation={img.rotation}
           savedScale={img.scale}
           onTransformUpdate={onTransformUpdate}
+          billboard={billboardIds.has(img.id)}
         />
       ))}
       <Grid

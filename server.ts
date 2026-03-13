@@ -47,8 +47,21 @@ let db: any;
     scale_x REAL DEFAULT 1,
     scale_y REAL DEFAULT 1,
     scale_z REAL DEFAULT 1,
+    billboard INTEGER DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )`);
+
+  // Migration: add billboard column if missing
+  const cols = await db.all("PRAGMA table_info(scene_objects)");
+  if (!cols.some((c: any) => c.name === 'billboard')) {
+    await db.exec("ALTER TABLE scene_objects ADD COLUMN billboard INTEGER DEFAULT 0");
+  }
+
+  // Migration: add prompt column to images if missing
+  const imgCols = await db.all("PRAGMA table_info(images)");
+  if (!imgCols.some((c: any) => c.name === 'prompt')) {
+    await db.exec("ALTER TABLE images ADD COLUMN prompt TEXT DEFAULT ''");
+  }
 })();
 
 const app = express();
@@ -64,7 +77,7 @@ const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 app.get("/api/images", async (req: Request, res: Response) => {
   try {
     const images = await db.all(
-      "SELECT id, created_at FROM images ORDER BY created_at DESC",
+      "SELECT id, prompt, created_at FROM images ORDER BY created_at DESC",
     );
     res.json(images);
   } catch (error) {
@@ -142,7 +155,7 @@ app.post(
         const modifiedBuffer = await image.getBuffer("image/png");
         fs.writeFileSync(filePath, modifiedBuffer);
 
-        await db.run("INSERT INTO images (id) VALUES (?)", [id]);
+        await db.run("INSERT INTO images (id, prompt) VALUES (?, ?)", [id, prompt]);
 
         res.json({ image: `/images/${filename}` });
       } else {
@@ -161,7 +174,7 @@ app.post(
 app.get("/api/scene-objects", async (req: Request, res: Response) => {
   try {
     const rows = await db.all(
-      "SELECT id, image_id, position_x, position_y, position_z, rotation_x, rotation_y, rotation_z, scale_x, scale_y, scale_z FROM scene_objects ORDER BY created_at ASC",
+      "SELECT id, image_id, position_x, position_y, position_z, rotation_x, rotation_y, rotation_z, scale_x, scale_y, scale_z, billboard FROM scene_objects ORDER BY created_at ASC",
     );
     const objects = rows.map((r: any) => ({
       id: r.id,
@@ -170,6 +183,7 @@ app.get("/api/scene-objects", async (req: Request, res: Response) => {
       position: [r.position_x, r.position_y, r.position_z],
       rotation: [r.rotation_x, r.rotation_y, r.rotation_z],
       scale: [r.scale_x, r.scale_y, r.scale_z],
+      billboard: !!r.billboard,
     }));
     res.json(objects);
   } catch (error) {
@@ -207,14 +221,16 @@ app.put(
         positionX, positionY, positionZ,
         rotationX, rotationY, rotationZ,
         scaleX, scaleY, scaleZ,
+        billboard,
       } = req.body;
       await db.run(
         `UPDATE scene_objects SET
           position_x = ?, position_y = ?, position_z = ?,
           rotation_x = ?, rotation_y = ?, rotation_z = ?,
-          scale_x = ?, scale_y = ?, scale_z = ?
+          scale_x = ?, scale_y = ?, scale_z = ?,
+          billboard = ?
         WHERE id = ?`,
-        [positionX, positionY, positionZ, rotationX, rotationY, rotationZ, scaleX, scaleY, scaleZ, id],
+        [positionX, positionY, positionZ, rotationX, rotationY, rotationZ, scaleX, scaleY, scaleZ, billboard ? 1 : 0, id],
       );
       res.json({ ok: true });
     } catch (error) {

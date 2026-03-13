@@ -4,6 +4,7 @@ import './App.css'
 
 interface ImageRecord {
   id: string;
+  prompt: string;
   created_at: string;
 }
 
@@ -14,6 +15,7 @@ interface AcceptedImage {
   position?: [number, number, number];
   rotation?: [number, number, number];
   scale?: [number, number, number];
+  billboard?: boolean;
 }
 
 const HOLD_DURATION = 2000
@@ -29,6 +31,8 @@ function App() {
   const [selectedImageId, setSelectedImageId] = useState<number | null>(null)
   const [selectionMode, setSelectionMode] = useState(false)
   const [transformMode, setTransformMode] = useState<'translate' | 'rotate' | 'scale'>('translate')
+  const [snapToGroundTrigger, setSnapToGroundTrigger] = useState(0)
+  const [billboardIds, setBillboardIds] = useState<Set<number>>(new Set())
 
   // Hold-to-select state
   const [holdTarget, setHoldTarget] = useState<number | null>(null)
@@ -50,6 +54,7 @@ function App() {
         if (res.ok) {
           const data = await res.json()
           setAcceptedImages(data)
+          setBillboardIds(new Set(data.filter((d: AcceptedImage) => d.billboard).map((d: AcceptedImage) => d.id)))
         }
       } catch (err) {
         console.error('Failed to load scene objects', err)
@@ -129,11 +134,13 @@ function App() {
               positionX: t.position[0], positionY: t.position[1], positionZ: t.position[2],
               rotationX: t.rotation[0], rotationY: t.rotation[1], rotationZ: t.rotation[2],
               scaleX: t.scale[0], scaleY: t.scale[1], scaleZ: t.scale[2],
+              billboard: billboardIds.has(selectedImageId),
             }),
           })
+          const isBillboard = billboardIds.has(selectedImageId)
           setAcceptedImages(prev => prev.map(img =>
             img.id === selectedImageId
-              ? { ...img, position: t.position, rotation: t.rotation, scale: t.scale }
+              ? { ...img, position: t.position, rotation: t.rotation, scale: t.scale, billboard: isBillboard }
               : img
           ))
         } catch (err) {
@@ -143,7 +150,7 @@ function App() {
     }
     setSelectionMode(false)
     setSelectedImageId(null)
-  }, [selectedImageId])
+  }, [selectedImageId, billboardIds])
 
   const togglePanel = useCallback(() => {
     setPanelOpen(prev => !prev)
@@ -233,13 +240,13 @@ function App() {
               <circle
                 cx="22" cy="22" r="18"
                 fill="none"
-                stroke="rgba(100, 108, 255, 0.3)"
+                stroke="rgba(249, 115, 22, 0.3)"
                 strokeWidth="3"
               />
               <circle
                 cx="22" cy="22" r="18"
                 fill="none"
-                stroke="#646cff"
+                stroke="#f97316"
                 strokeWidth="3"
                 strokeDasharray={circumference}
                 strokeDashoffset={circumference * (1 - holdProgress)}
@@ -259,6 +266,8 @@ function App() {
         onHoldEnd={handleHoldEnd}
         transformMode={transformMode}
         onTransformUpdate={handleTransformUpdate}
+        snapToGroundTrigger={snapToGroundTrigger}
+        billboardIds={billboardIds}
       />
 
       {panelOpen && (
@@ -326,7 +335,7 @@ function App() {
                     handleSubmit(fakeEvent)
                   }}
                 >
-                  {loading ? 'Generating...' : '♻ Recycle'}
+                  {loading ? 'Generating...' : '♻ Regenerate'}
                 </button>
               </div>
             </div>
@@ -340,8 +349,9 @@ function App() {
                   <div key={img.id} className="gallery-item">
                     <img
                       src={`/images/${img.id}.png`}
-                      alt={`Generated at ${img.created_at}`}
+                      alt={img.prompt || `Generated at ${img.created_at}`}
                     />
+                    <p className="gallery-item-title">{img.prompt || 'Untitled'}</p>
                     <p>{new Date(img.created_at).toLocaleString()}</p>
                   </div>
                 ))}
@@ -371,6 +381,28 @@ function App() {
               onClick={() => setTransformMode('scale')}
             >
               Scale <kbd>T</kbd>
+            </button>
+          </div>
+          <div className="action-buttons-row">
+            <button
+              className="snap-ground-btn"
+              onClick={() => setSnapToGroundTrigger(n => n + 1)}
+            >
+              Snap to Ground
+            </button>
+            <button
+              className={`billboard-btn ${selectedImageId != null && billboardIds.has(selectedImageId) ? 'active' : ''}`}
+              onClick={() => {
+                if (selectedImageId == null) return
+                setBillboardIds(prev => {
+                  const next = new Set(prev)
+                  if (next.has(selectedImageId)) next.delete(selectedImageId)
+                  else next.add(selectedImageId)
+                  return next
+                })
+              }}
+            >
+              Billboard
             </button>
           </div>
           <button className="accept-placement-btn" onClick={handleAcceptPlacement}>
