@@ -5,6 +5,7 @@ import {
   OrbitControls as DreiOrbitControls,
   TransformControls as DreiTransformControls,
   Grid,
+  Environment,
 } from '@react-three/drei'
 import * as THREE from 'three'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
@@ -19,11 +20,14 @@ interface AcceptedImage {
 }
 
 const MOVE_SPEED = 5
+const SPRINT_MULTIPLIER = 2.5
 const PLAYER_HEIGHT = 2
+const COLLISION_DISTANCE = 0.6
 
 function FirstPersonMovement({ disabled }: { disabled: boolean }) {
-  const { camera } = useThree()
+  const { camera, scene } = useThree()
   const keys = useRef<Record<string, boolean>>({})
+  const raycaster = useRef(new THREE.Raycaster())
 
   const onKeyDown = useCallback((e: KeyboardEvent) => {
     keys.current[e.code] = true
@@ -42,6 +46,30 @@ function FirstPersonMovement({ disabled }: { disabled: boolean }) {
     }
   }, [onKeyDown, onKeyUp])
 
+  // Collect all meshes belonging to image planes
+  const getCollidables = useCallback(() => {
+    const meshes: THREE.Mesh[] = []
+    scene.traverse((obj) => {
+      let parent: THREE.Object3D | null = obj
+      while (parent) {
+        if (parent.userData.imageId != null) {
+          if (obj instanceof THREE.Mesh) meshes.push(obj)
+          break
+        }
+        parent = parent.parent
+      }
+    })
+    return meshes
+  }, [scene])
+
+  // Check if moving in a direction would collide
+  const canMove = useCallback((origin: THREE.Vector3, direction: THREE.Vector3, distance: number) => {
+    raycaster.current.set(origin, direction)
+    raycaster.current.far = distance + COLLISION_DISTANCE
+    const hits = raycaster.current.intersectObjects(getCollidables(), false)
+    return hits.length === 0 || hits[0].distance > distance + COLLISION_DISTANCE
+  }, [getCollidables])
+
   useFrame((_, delta) => {
     if (disabled) return
 
@@ -53,19 +81,33 @@ function FirstPersonMovement({ disabled }: { disabled: boolean }) {
     const right = new THREE.Vector3()
     right.crossVectors(forward, camera.up).normalize()
 
-    const speed = MOVE_SPEED * delta
+    const sprinting = keys.current['ShiftLeft'] || keys.current['ShiftRight']
+    const speed = MOVE_SPEED * (sprinting ? SPRINT_MULTIPLIER : 1) * delta
+
+    const origin = camera.position.clone()
+    origin.y = PLAYER_HEIGHT * 0.5 // raycast from mid-body height
 
     if (keys.current['KeyW'] || keys.current['ArrowUp']) {
-      camera.position.addScaledVector(forward, speed)
+      if (canMove(origin, forward, speed)) {
+        camera.position.addScaledVector(forward, speed)
+      }
     }
     if (keys.current['KeyS'] || keys.current['ArrowDown']) {
-      camera.position.addScaledVector(forward, -speed)
+      const back = forward.clone().negate()
+      if (canMove(origin, back, speed)) {
+        camera.position.addScaledVector(forward, -speed)
+      }
     }
     if (keys.current['KeyA'] || keys.current['ArrowLeft']) {
-      camera.position.addScaledVector(right, -speed)
+      const left = right.clone().negate()
+      if (canMove(origin, left, speed)) {
+        camera.position.addScaledVector(right, -speed)
+      }
     }
     if (keys.current['KeyD'] || keys.current['ArrowRight']) {
-      camera.position.addScaledVector(right, speed)
+      if (canMove(origin, right, speed)) {
+        camera.position.addScaledVector(right, speed)
+      }
     }
 
     camera.position.y = PLAYER_HEIGHT
@@ -210,7 +252,7 @@ function ImagePlane({
         <>
           <mesh>
             <planeGeometry args={planeSize} />
-            <meshStandardMaterial map={texture} transparent alphaTest={0.1} depthWrite={false} side={THREE.DoubleSide} />
+            <meshStandardMaterial map={texture} transparent alphaTest={0.5} side={THREE.DoubleSide} />
           </mesh>
           {selected && (
             <mesh position={[0, 0, -0.01]}>
@@ -479,6 +521,7 @@ export default function ThreeScene({
       camera={{ position: [0, PLAYER_HEIGHT, 5], fov: 60 }}
       style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', zIndex: 0 }}
     >
+      <Environment files="/sky.hdr" background />
       <ambientLight intensity={0.5} />
       <pointLight position={[10, 10, 10]} />
       <JsonControls disabled={panelOpen || selectionMode} />

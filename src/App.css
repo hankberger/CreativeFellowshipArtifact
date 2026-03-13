@@ -26,8 +26,8 @@
 .crosshair::after {
   content: '';
   position: absolute;
-  background: var(--forge-gold);
-  opacity: 0.7;
+  background: #ffffff;
+  opacity: 0.85;
 }
 
 .crosshair::before {
@@ -53,15 +53,15 @@
   width: 52px;
   height: 52px;
   transform: translate(-50%, -50%);
-  filter: drop-shadow(0 0 6px var(--forge-glow-strong));
+  filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.4));
 }
 
 .hold-ring circle:first-child {
-  stroke: var(--forge-border);
+  stroke: rgba(255, 255, 255, 0.3);
 }
 
 .hold-ring circle:last-child {
-  stroke: var(--forge-gold);
+  stroke: #ffffff;
 }
 
 /* ═══════════════════════════════════════════════
@@ -975,6 +975,31 @@
 }
 
 .accept-placement-btn:active {
+  transform: scale(0.97);
+}
+
+.remove-object-btn {
+  background: transparent;
+  border: 1px solid #ff4d6a;
+  color: #ff4d6a;
+  padding: 0.5rem 2rem;
+  border-radius: 2px;
+  font-family: 'Syne', sans-serif;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.3s;
+  box-shadow: 0 0 20px rgba(255, 77, 106, 0.1);
+}
+
+.remove-object-btn:hover {
+  background: rgba(255, 77, 106, 0.15);
+  box-shadow: 0 0 30px rgba(255, 77, 106, 0.25);
+}
+
+.remove-object-btn:active {
   transform: scale(0.97);
 }
 

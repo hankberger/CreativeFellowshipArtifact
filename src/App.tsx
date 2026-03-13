@@ -65,8 +65,8 @@ function App() {
 
   const handleAccept = async () => {
     if (imageUrl) {
-      // Extract imageId from URL like /images/<uuid>.png
-      const match = imageUrl.match(/\/images\/(.+)\.png$/)
+      // Extract imageId from URL like /images/<uuid>.webp
+      const match = imageUrl.match(/\/images\/(.+)\.webp$/)
       if (!match) return
       const imageId = match[1]
       try {
@@ -153,6 +153,23 @@ function App() {
     setSelectedImageId(null)
   }, [selectedImageId, billboardIds])
 
+  const handleRemoveObject = useCallback(async () => {
+    if (selectedImageId == null) return
+    try {
+      await fetch(`/api/scene-objects/${selectedImageId}`, { method: 'DELETE' })
+      setAcceptedImages(prev => prev.filter(img => img.id !== selectedImageId))
+      setBillboardIds(prev => {
+        const next = new Set(prev)
+        next.delete(selectedImageId!)
+        return next
+      })
+    } catch (err) {
+      console.error('Failed to remove object', err)
+    }
+    setSelectionMode(false)
+    setSelectedImageId(null)
+  }, [selectedImageId])
+
   const togglePanel = useCallback(() => {
     setPanelOpen(prev => !prev)
   }, [])
@@ -166,6 +183,7 @@ function App() {
         if (e.code === 'KeyR') setTransformMode('rotate')
         if (e.code === 'KeyT') setTransformMode('scale')
         if (e.code === 'Enter' || e.code === 'Escape') handleAcceptPlacement()
+        if (e.code === 'Delete') handleRemoveObject()
         return
       }
 
@@ -175,7 +193,7 @@ function App() {
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [togglePanel, selectionMode, handleAcceptPlacement])
+  }, [togglePanel, selectionMode, handleAcceptPlacement, handleRemoveObject])
 
   const fetchGallery = async () => {
     try {
@@ -274,7 +292,7 @@ function App() {
       {panelOpen && (
         <div className="floating-panel">
           <div className="panel-header">
-            <h1><span className="panel-header-badge">Image Forge</span></h1>
+            <h1><span className="panel-header-badge">Image Creator</span></h1>
             <button className="panel-close" onClick={() => setPanelOpen(false)}>
               &times;
             </button>
@@ -294,7 +312,7 @@ function App() {
               disabled={loading || !prompt.trim()}
               className="generate-btn"
             >
-              <span className="generate-btn-text">{loading ? 'Forging...' : 'Materialize'}</span>
+              <span className="generate-btn-text">{loading ? 'Generating...' : 'Generate'}</span>
             </button>
           </form>
 
@@ -324,7 +342,7 @@ function App() {
 
           {imageUrl && (
             <div className="panel-result">
-              <h2>Materialized</h2>
+              <h2>Result</h2>
               <img src={imageUrl} alt="Generated" />
               <div className="result-actions">
                 <button className="accept-btn" onClick={handleAccept}>
@@ -338,7 +356,7 @@ function App() {
                     handleSubmit(fakeEvent)
                   }}
                 >
-                  {loading ? 'Forging...' : 'Reforge'}
+                  {loading ? 'Generating...' : 'Regenerate'}
                 </button>
               </div>
             </div>
@@ -374,7 +392,7 @@ function App() {
                           body: JSON.stringify({ imageId: img.id }),
                         })
                         const { id } = await res.json()
-                        const url = `/images/${img.id}.png`
+                        const url = `/images/${img.id}.webp`
                         setAcceptedImages(prev => [...prev, { id, imageId: img.id, url }])
                         setPanelOpen(false)
                         setSelectedImageId(id)
@@ -386,7 +404,7 @@ function App() {
                     }}
                   >
                     <img
-                      src={`/images/${img.id}.png`}
+                      src={`/images/${img.id}.webp`}
                       alt={img.prompt || `Generated at ${img.created_at}`}
                     />
                     <p className="gallery-item-title">{img.prompt || 'Untitled'}</p>
@@ -446,8 +464,11 @@ function App() {
           <button className="accept-placement-btn" onClick={handleAcceptPlacement}>
             Accept Placement
           </button>
+          <button className="remove-object-btn" onClick={handleRemoveObject}>
+            Remove
+          </button>
           <div className="selection-hint">
-            <kbd>Enter</kbd> or <kbd>Esc</kbd> to confirm
+            <kbd>Enter</kbd> or <kbd>Esc</kbd> to confirm &middot; <kbd>Del</kbd> to remove
           </div>
         </div>
       )}
@@ -471,7 +492,7 @@ function App() {
             <div className="controls-guide-divider" />
             <div className="controls-guide-row controls-guide-action">
               <kbd className="kbd-highlight">E</kbd>
-              <span className="controls-guide-row-label">Open Forge</span>
+              <span className="controls-guide-row-label">Open Creator</span>
             </div>
           </div>
         </div>

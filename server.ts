@@ -119,7 +119,7 @@ app.post(
 
       if (base64Image) {
         const id = uuidv4();
-        const filename = `${id}.png`;
+        const filename = `${id}.webp`;
         const filePath = path.join(imagesDir, filename);
         const buffer = Buffer.from(base64Image, "base64");
 
@@ -152,7 +152,7 @@ app.post(
           },
         );
 
-        const modifiedBuffer = await image.getBuffer("image/png");
+        const modifiedBuffer = await image.getBuffer("image/webp");
         fs.writeFileSync(filePath, modifiedBuffer);
 
         await db.run("INSERT INTO images (id, prompt) VALUES (?, ?)", [id, prompt]);
