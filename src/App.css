@@ -1178,6 +1178,56 @@
   color: var(--forge-text-muted);
 }
 
+.dialog-entry-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.dialog-entry-content .dialog-entry-text {
+  width: 100%;
+}
+
+.dialog-set-camera-btn {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--forge-border);
+  border-radius: 2px;
+  color: var(--forge-text-muted);
+  font-family: 'DM Mono', monospace;
+  font-size: 0.6rem;
+  padding: 0.2rem 0.4rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  align-self: flex-start;
+}
+
+.dialog-set-camera-btn:hover {
+  border-color: var(--forge-border-hover);
+  color: var(--forge-text);
+}
+
+.dialog-set-camera-btn.has-camera {
+  background: rgba(92, 224, 216, 0.08);
+  border-color: var(--forge-cyan);
+  color: var(--forge-cyan);
+}
+
+.dialog-clear-camera-btn {
+  background: none;
+  border: none;
+  color: var(--forge-text-muted);
+  font-size: 0.7rem;
+  cursor: pointer;
+  padding: 0.1rem 0.3rem;
+  align-self: flex-start;
+  transition: color 0.2s;
+}
+
+.dialog-clear-camera-btn:hover {
+  color: #ff6b6b;
+}
+
 .dialog-entry-remove {
   background: none;
   border: 1px solid transparent;

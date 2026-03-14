@@ -676,6 +676,79 @@ function ProximityDetector({
   return null
 }
 
+// Exposes the camera state getter via a ref from App
+function CameraStateExposer({ getCameraStateRef }: {
+  getCameraStateRef: React.MutableRefObject<(() => { position: [number, number, number]; quaternion: [number, number, number, number] }) | null>
+}) {
+  const { camera } = useThree()
+
+  useEffect(() => {
+    getCameraStateRef.current = () => ({
+      position: [camera.position.x, camera.position.y, camera.position.z],
+      quaternion: [camera.quaternion.x, camera.quaternion.y, camera.quaternion.z, camera.quaternion.w],
+    })
+    return () => { getCameraStateRef.current = null }
+  }, [camera, getCameraStateRef])
+
+  return null
+}
+
+// LERPs the camera between dialog camera positions
+function DialogCameraController({ target, dialogActive }: {
+  target: { camPos: [number, number, number] | null; camQuat: [number, number, number, number] | null } | null
+  dialogActive: boolean
+}) {
+  const { camera } = useThree()
+  const savedCamState = useRef<{ position: THREE.Vector3; quaternion: THREE.Quaternion } | null>(null)
+  const targetPos = useRef(new THREE.Vector3())
+  const targetQuat = useRef(new THREE.Quaternion())
+  const hasTarget = useRef(false)
+  const prevDialogActive = useRef(false)
+
+  // Save camera when dialog starts, restore when it ends
+  useEffect(() => {
+    if (dialogActive && !prevDialogActive.current) {
+      savedCamState.current = {
+        position: camera.position.clone(),
+        quaternion: camera.quaternion.clone(),
+      }
+    } else if (!dialogActive && prevDialogActive.current && savedCamState.current) {
+      // Restore camera
+      camera.position.copy(savedCamState.current.position)
+      camera.quaternion.copy(savedCamState.current.quaternion)
+      savedCamState.current = null
+      hasTarget.current = false
+    }
+    prevDialogActive.current = dialogActive
+  }, [dialogActive, camera])
+
+  // Update target when dialog index changes
+  useEffect(() => {
+    if (!dialogActive || !target) {
+      hasTarget.current = false
+      return
+    }
+    if (target.camPos && target.camQuat) {
+      targetPos.current.set(target.camPos[0], target.camPos[1], target.camPos[2])
+      targetQuat.current.set(target.camQuat[0], target.camQuat[1], target.camQuat[2], target.camQuat[3])
+      hasTarget.current = true
+    } else {
+      hasTarget.current = false
+    }
+  }, [target, dialogActive])
+
+  // Smoothly LERP camera each frame
+  useFrame(() => {
+    if (!dialogActive || !hasTarget.current) return
+
+    const lerpSpeed = 0.04
+    camera.position.lerp(targetPos.current, lerpSpeed)
+    camera.quaternion.slerp(targetQuat.current, lerpSpeed)
+  })
+
+  return null
+}
+
 interface ThreeSceneProps {
   panelOpen: boolean
   acceptedImages: AcceptedImage[]
@@ -692,6 +765,8 @@ interface ThreeSceneProps {
   characterRadii: Map<number, number>
   onCharacterProximity: (characterId: number | null) => void
   dialogActive: boolean
+  getCameraStateRef: React.MutableRefObject<(() => { position: [number, number, number]; quaternion: [number, number, number, number] }) | null>
+  dialogCameraTarget: { camPos: [number, number, number] | null; camQuat: [number, number, number, number] | null } | null
 }
 
 export default function ThreeScene({
@@ -710,6 +785,8 @@ export default function ThreeScene({
   characterRadii,
   onCharacterProximity,
   dialogActive,
+  getCameraStateRef,
+  dialogCameraTarget,
 }: ThreeSceneProps) {
   return (
     <Canvas
@@ -719,9 +796,11 @@ export default function ThreeScene({
       <Environment files="/sky.hdr" background environmentIntensity={0.08} backgroundIntensity={0.25} />
       <ambientLight intensity={0.5} />
       <pointLight position={[10, 10, 10]} />
-      <JsonControls disabled={panelOpen || selectionMode || dialogActive} />
+      <JsonControls disabled={panelOpen || selectionMode} />
       <FirstPersonMovement disabled={panelOpen || selectionMode || dialogActive} />
       <CameraStateSaver selectionMode={selectionMode} />
+      <CameraStateExposer getCameraStateRef={getCameraStateRef} />
+      <DialogCameraController target={dialogCameraTarget} dialogActive={dialogActive} />
       <HoldToSelect disabled={selectionMode || dialogActive} onHoldStart={onHoldStart} onHoldEnd={onHoldEnd} />
       <ProximityDetector
         acceptedImages={acceptedImages}

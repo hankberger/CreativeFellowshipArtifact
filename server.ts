@@ -76,9 +76,28 @@ let db: any;
     scene_object_id INTEGER NOT NULL,
     sort_order INTEGER DEFAULT 0,
     text TEXT NOT NULL DEFAULT '',
+    cam_pos_x REAL,
+    cam_pos_y REAL,
+    cam_pos_z REAL,
+    cam_quat_x REAL,
+    cam_quat_y REAL,
+    cam_quat_z REAL,
+    cam_quat_w REAL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (scene_object_id) REFERENCES scene_objects(id) ON DELETE CASCADE
   )`);
+
+  // Migration: add camera columns to character_dialog if missing
+  const dialogCols = await db.all("PRAGMA table_info(character_dialog)");
+  if (!dialogCols.some((c: any) => c.name === 'cam_pos_x')) {
+    await db.exec("ALTER TABLE character_dialog ADD COLUMN cam_pos_x REAL");
+    await db.exec("ALTER TABLE character_dialog ADD COLUMN cam_pos_y REAL");
+    await db.exec("ALTER TABLE character_dialog ADD COLUMN cam_pos_z REAL");
+    await db.exec("ALTER TABLE character_dialog ADD COLUMN cam_quat_x REAL");
+    await db.exec("ALTER TABLE character_dialog ADD COLUMN cam_quat_y REAL");
+    await db.exec("ALTER TABLE character_dialog ADD COLUMN cam_quat_z REAL");
+    await db.exec("ALTER TABLE character_dialog ADD COLUMN cam_quat_w REAL");
+  }
 
   // Migration: add prompt column to images if missing
   const imgCols = await db.all("PRAGMA table_info(images)");
@@ -290,10 +309,17 @@ app.get(
     try {
       const { id } = req.params;
       const rows = await db.all(
-        "SELECT id, text, sort_order FROM character_dialog WHERE scene_object_id = ? ORDER BY sort_order ASC",
+        "SELECT id, text, sort_order, cam_pos_x, cam_pos_y, cam_pos_z, cam_quat_x, cam_quat_y, cam_quat_z, cam_quat_w FROM character_dialog WHERE scene_object_id = ? ORDER BY sort_order ASC",
         [id],
       );
-      res.json(rows);
+      const entries = rows.map((r: any) => ({
+        id: r.id,
+        text: r.text,
+        sort_order: r.sort_order,
+        camPos: r.cam_pos_x != null ? [r.cam_pos_x, r.cam_pos_y, r.cam_pos_z] : null,
+        camQuat: r.cam_quat_x != null ? [r.cam_quat_x, r.cam_quat_y, r.cam_quat_z, r.cam_quat_w] : null,
+      }));
+      res.json(entries);
     } catch (error) {
       console.error("Error fetching dialog:", error);
       res.status(500).json({ error: "Internal server error" });
@@ -313,18 +339,30 @@ app.put(
       // Replace all dialog for this object
       await db.run("DELETE FROM character_dialog WHERE scene_object_id = ?", [id]);
       for (let i = 0; i < entries.length; i++) {
-        const text = entries[i].text || "";
+        const e = entries[i];
+        const text = e.text || "";
+        const camPos = e.camPos;
+        const camQuat = e.camQuat;
         await db.run(
-          "INSERT INTO character_dialog (scene_object_id, sort_order, text) VALUES (?, ?, ?)",
-          [id, i, text],
+          "INSERT INTO character_dialog (scene_object_id, sort_order, text, cam_pos_x, cam_pos_y, cam_pos_z, cam_quat_x, cam_quat_y, cam_quat_z, cam_quat_w) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+          [id, i, text,
+            camPos?.[0] ?? null, camPos?.[1] ?? null, camPos?.[2] ?? null,
+            camQuat?.[0] ?? null, camQuat?.[1] ?? null, camQuat?.[2] ?? null, camQuat?.[3] ?? null],
         );
       }
       // Return the saved entries
       const rows = await db.all(
-        "SELECT id, text, sort_order FROM character_dialog WHERE scene_object_id = ? ORDER BY sort_order ASC",
+        "SELECT id, text, sort_order, cam_pos_x, cam_pos_y, cam_pos_z, cam_quat_x, cam_quat_y, cam_quat_z, cam_quat_w FROM character_dialog WHERE scene_object_id = ? ORDER BY sort_order ASC",
         [id],
       );
-      res.json(rows);
+      const result = rows.map((r: any) => ({
+        id: r.id,
+        text: r.text,
+        sort_order: r.sort_order,
+        camPos: r.cam_pos_x != null ? [r.cam_pos_x, r.cam_pos_y, r.cam_pos_z] : null,
+        camQuat: r.cam_quat_x != null ? [r.cam_quat_x, r.cam_quat_y, r.cam_quat_z, r.cam_quat_w] : null,
+      }));
+      res.json(result);
     } catch (error) {
       console.error("Error saving dialog:", error);
       res.status(500).json({ error: "Internal server error" });

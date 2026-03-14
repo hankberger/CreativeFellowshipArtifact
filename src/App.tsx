@@ -11,6 +11,8 @@ interface ImageRecord {
 interface DialogEntry {
   id?: number;
   text: string;
+  camPos?: [number, number, number] | null;
+  camQuat?: [number, number, number, number] | null;
 }
 
 interface AcceptedImage {
@@ -51,6 +53,9 @@ function App() {
   const [activeDialog, setActiveDialog] = useState<DialogEntry[]>([])
   const [activeDialogIndex, setActiveDialogIndex] = useState(0)
   const [activeDialogCharId, setActiveDialogCharId] = useState<number | null>(null)
+
+  // Ref to get camera state from ThreeScene
+  const getCameraStateRef = useRef<(() => { position: [number, number, number]; quaternion: [number, number, number, number] }) | null>(null)
 
   // Hold-to-select state
   const [holdTarget, setHoldTarget] = useState<number | null>(null)
@@ -410,6 +415,11 @@ function App() {
         characterRadii={characterRadii}
         onCharacterProximity={handleCharacterProximity}
         dialogActive={activeDialog.length > 0}
+        getCameraStateRef={getCameraStateRef}
+        dialogCameraTarget={activeDialog.length > 0 && activeDialog[activeDialogIndex] ? {
+          camPos: activeDialog[activeDialogIndex].camPos || null,
+          camQuat: activeDialog[activeDialogIndex].camQuat || null,
+        } : null}
       />
 
       {panelOpen && (
@@ -688,17 +698,50 @@ function App() {
                 {dialogEntries.map((entry, idx) => (
                   <div key={idx} className="dialog-entry">
                     <span className="dialog-entry-number">{idx + 1}</span>
-                    <textarea
-                      className="dialog-entry-text"
-                      value={entry.text}
-                      onChange={(e) => {
-                        const updated = [...dialogEntries]
-                        updated[idx] = { ...updated[idx], text: e.target.value }
-                        setDialogEntries(updated)
-                      }}
-                      placeholder="Enter dialog text..."
-                      rows={2}
-                    />
+                    <div className="dialog-entry-content">
+                      <textarea
+                        className="dialog-entry-text"
+                        value={entry.text}
+                        onChange={(e) => {
+                          const updated = [...dialogEntries]
+                          updated[idx] = { ...updated[idx], text: e.target.value }
+                          setDialogEntries(updated)
+                        }}
+                        placeholder="Enter dialog text..."
+                        rows={2}
+                      />
+                      <button
+                        className={`dialog-set-camera-btn ${entry.camPos ? 'has-camera' : ''}`}
+                        onClick={() => {
+                          const camState = getCameraStateRef.current?.()
+                          if (camState) {
+                            const updated = [...dialogEntries]
+                            updated[idx] = {
+                              ...updated[idx],
+                              camPos: camState.position,
+                              camQuat: camState.quaternion,
+                            }
+                            setDialogEntries(updated)
+                          }
+                        }}
+                        title={entry.camPos ? 'Camera position set — click to update' : 'Set current camera position for this dialog line'}
+                      >
+                        {entry.camPos ? 'Cam Set' : 'Set Cam'}
+                      </button>
+                      {entry.camPos && (
+                        <button
+                          className="dialog-clear-camera-btn"
+                          onClick={() => {
+                            const updated = [...dialogEntries]
+                            updated[idx] = { ...updated[idx], camPos: null, camQuat: null }
+                            setDialogEntries(updated)
+                          }}
+                          title="Clear camera position"
+                        >
+                          &times;
+                        </button>
+                      )}
+                    </div>
                     <button
                       className="dialog-entry-remove"
                       onClick={() => {
