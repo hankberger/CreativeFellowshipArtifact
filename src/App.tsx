@@ -238,6 +238,9 @@ function App() {
     setPanelOpen(prev => !prev)
   }, [])
 
+  const activeDialogCharIdRef = useRef<number | null>(null)
+  useEffect(() => { activeDialogCharIdRef.current = activeDialogCharId }, [activeDialogCharId])
+
   const handleCharacterProximity = useCallback(async (characterId: number | null) => {
     if (characterId === null) {
       // Left radius — dismiss dialog
@@ -247,7 +250,7 @@ function App() {
       return
     }
     // Already showing dialog for this character
-    if (characterId === activeDialogCharId) return
+    if (characterId === activeDialogCharIdRef.current) return
     // Fetch dialog for this character
     try {
       const res = await fetch(`/api/scene-objects/${characterId}/dialog`)
@@ -263,19 +266,24 @@ function App() {
     } catch (err) {
       console.error('Failed to load character dialog', err)
     }
-  }, [activeDialogCharId])
+  }, [])
+
+  const activeDialogRef = useRef<DialogEntry[]>([])
+  useEffect(() => { activeDialogRef.current = activeDialog }, [activeDialog])
 
   const advanceDialog = useCallback(() => {
-    if (activeDialog.length === 0) return
-    if (activeDialogIndex < activeDialog.length - 1) {
-      setActiveDialogIndex(prev => prev + 1)
-    } else {
-      // End of dialog
-      setActiveDialog([])
-      setActiveDialogIndex(0)
-      setActiveDialogCharId(null)
-    }
-  }, [activeDialog, activeDialogIndex])
+    if (activeDialogRef.current.length === 0) return
+    setActiveDialogIndex(prev => {
+      if (prev < activeDialogRef.current.length - 1) {
+        return prev + 1
+      } else {
+        // End of dialog
+        setActiveDialog([])
+        setActiveDialogCharId(null)
+        return 0
+      }
+    })
+  }, [])
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
