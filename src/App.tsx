@@ -7,7 +7,7 @@ interface DialogTextHandle {
   skipToEnd: () => void
 }
 
-function DialogText({ text, handleRef }: { text: string; handleRef: React.MutableRefObject<DialogTextHandle | null> }) {
+function DialogText({ text, handleRef, onStreamingChange }: { text: string; handleRef: React.MutableRefObject<DialogTextHandle | null>; onStreamingChange?: (streaming: boolean) => void }) {
   const spaceIdx = text.indexOf(' ')
   const firstWord = spaceIdx === -1 ? text : text.slice(0, spaceIdx)
   const rest = spaceIdx === -1 ? '' : text.slice(spaceIdx)
@@ -16,6 +16,7 @@ function DialogText({ text, handleRef }: { text: string; handleRef: React.Mutabl
 
   useEffect(() => {
     setCharCount(0)
+    onStreamingChange?.(!!rest)
     if (!rest) return
     let i = 0
     intervalRef.current = setInterval(() => {
@@ -24,6 +25,7 @@ function DialogText({ text, handleRef }: { text: string; handleRef: React.Mutabl
       if (i >= rest.length) {
         if (intervalRef.current) clearInterval(intervalRef.current)
         intervalRef.current = null
+        onStreamingChange?.(false)
       }
     }, 30)
     return () => {
@@ -38,6 +40,7 @@ function DialogText({ text, handleRef }: { text: string; handleRef: React.Mutabl
       if (intervalRef.current) clearInterval(intervalRef.current)
       intervalRef.current = null
       setCharCount(rest.length)
+      onStreamingChange?.(false)
     },
   }
 
@@ -308,6 +311,7 @@ function App() {
   const activeDialogCharIdRef = useRef<number | null>(null)
   const dialogTextRef = useRef<DialogTextHandle | null>(null)
   const activeDialogRef = useRef<DialogEntry[]>([])
+  const [dialogStreaming, setDialogStreaming] = useState(false)
 
   const handleCharacterProximity = useCallback(async (characterId: number | null) => {
     if (characterId === null) {
@@ -513,7 +517,7 @@ function App() {
         characterRadii={characterRadii}
         onCharacterProximity={handleCharacterProximity}
         speakingImageIds={speakingImageIds}
-        speakingCharacterId={activeDialog.length > 0 ? activeDialogCharId : null}
+        speakingCharacterId={activeDialog.length > 0 && dialogStreaming ? activeDialogCharId : null}
         dialogActive={activeDialog.length > 0}
         getCameraStateRef={getCameraStateRef}
         dialogCameraTarget={activeDialog.length > 0 && activeDialog[activeDialogIndex] ? {
@@ -1042,7 +1046,7 @@ function App() {
         <div className="dialog-playback-overlay">
           <div className="dialog-card">
             <div className="dialog-card-text">
-              <DialogText text={activeDialog[activeDialogIndex]?.text || ''} handleRef={dialogTextRef} />
+              <DialogText text={activeDialog[activeDialogIndex]?.text || ''} handleRef={dialogTextRef} onStreamingChange={setDialogStreaming} />
             </div>
             <div className="dialog-card-footer">
               <span className="dialog-card-progress">{activeDialogIndex + 1} / {activeDialog.length}</span>
