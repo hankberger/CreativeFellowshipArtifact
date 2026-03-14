@@ -282,6 +282,71 @@ function App() {
     setSpeakingGalleryOpen(false)
   }, [selectedImageId, billboardIds, characterIds, characterRadii, speakingImageIds, dialogEntries, saveDialog])
 
+  const handleDuplicateObject = useCallback(async () => {
+    if (selectedImageId == null) return
+    const source = acceptedImages.find(img => img.id === selectedImageId)
+    if (!source) return
+    try {
+      // First accept placement of the current object
+      const t = latestTransforms.current.get(selectedImageId)
+      if (t) {
+        await fetch(`/api/scene-objects/${selectedImageId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            positionX: t.position[0], positionY: t.position[1], positionZ: t.position[2],
+            rotationX: t.rotation[0], rotationY: t.rotation[1], rotationZ: t.rotation[2],
+            scaleX: t.scale[0], scaleY: t.scale[1], scaleZ: t.scale[2],
+            billboard: billboardIds.has(selectedImageId),
+            character: characterIds.has(selectedImageId),
+            radius: characterRadii.get(selectedImageId) ?? 5,
+            speakingImageId: speakingImageIds.get(selectedImageId) ?? null,
+          }),
+        })
+        const isBillboard = billboardIds.has(selectedImageId)
+        const isCharacter = characterIds.has(selectedImageId)
+        if (isCharacter && dialogEntries.length > 0) {
+          await saveDialog(selectedImageId, dialogEntries)
+        }
+        setAcceptedImages(prev => prev.map(img =>
+          img.id === selectedImageId
+            ? { ...img, position: t.position, rotation: t.rotation, scale: t.scale, billboard: isBillboard, character: isCharacter, radius: characterRadii.get(selectedImageId) ?? 5, speakingImageId: speakingImageIds.get(selectedImageId) ?? null }
+            : img
+        ))
+      }
+
+      // Create duplicate scene object with same imageId
+      const res = await fetch('/api/scene-objects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageId: source.imageId }),
+      })
+      const { id: newId } = await res.json()
+
+      // Copy scale from source, offset position slightly
+      const srcPos = t?.position ?? source.position ?? [0, 0, 0]
+      const srcScale = t?.scale ?? source.scale ?? [1, 1, 1]
+      const newPos: [number, number, number] = [srcPos[0] + 1, srcPos[1], srcPos[2]]
+
+      setAcceptedImages(prev => [...prev, {
+        id: newId,
+        imageId: source.imageId,
+        url: source.url,
+        position: newPos,
+        scale: [...srcScale] as [number, number, number],
+      }])
+
+      setDialogOpen(false)
+      setDialogEntries([])
+      setSpeakingGalleryOpen(false)
+      setSelectedImageId(newId)
+      setSelectionMode(true)
+      setTransformMode('translate')
+    } catch (err) {
+      console.error('Failed to duplicate object', err)
+    }
+  }, [selectedImageId, acceptedImages, billboardIds, characterIds, characterRadii, speakingImageIds, dialogEntries, saveDialog])
+
   const handleRemoveObject = useCallback(async () => {
     if (selectedImageId == null) return
     try {
@@ -887,6 +952,75 @@ function App() {
               Flat
             </button>
           </div>
+          <div className="snap-rotation-row">
+            <span className="snap-rotation-label">90&deg;</span>
+            <button
+              className="snap-rotation-btn"
+              onClick={() => {
+                const t = latestTransforms.current.get(selectedImageId!)
+                const cur = t?.rotation || [0, 0, 0]
+                setSnapRotationTrigger(prev => ({ rotation: [cur[0] + Math.PI / 2, cur[1], cur[2]], counter: prev.counter + 1 }))
+              }}
+              title="Rotate +90° on X axis"
+            >
+              X+
+            </button>
+            <button
+              className="snap-rotation-btn"
+              onClick={() => {
+                const t = latestTransforms.current.get(selectedImageId!)
+                const cur = t?.rotation || [0, 0, 0]
+                setSnapRotationTrigger(prev => ({ rotation: [cur[0] - Math.PI / 2, cur[1], cur[2]], counter: prev.counter + 1 }))
+              }}
+              title="Rotate -90° on X axis"
+            >
+              X-
+            </button>
+            <button
+              className="snap-rotation-btn"
+              onClick={() => {
+                const t = latestTransforms.current.get(selectedImageId!)
+                const cur = t?.rotation || [0, 0, 0]
+                setSnapRotationTrigger(prev => ({ rotation: [cur[0], cur[1] + Math.PI / 2, cur[2]], counter: prev.counter + 1 }))
+              }}
+              title="Rotate +90° on Y axis"
+            >
+              Y+
+            </button>
+            <button
+              className="snap-rotation-btn"
+              onClick={() => {
+                const t = latestTransforms.current.get(selectedImageId!)
+                const cur = t?.rotation || [0, 0, 0]
+                setSnapRotationTrigger(prev => ({ rotation: [cur[0], cur[1] - Math.PI / 2, cur[2]], counter: prev.counter + 1 }))
+              }}
+              title="Rotate -90° on Y axis"
+            >
+              Y-
+            </button>
+            <button
+              className="snap-rotation-btn"
+              onClick={() => {
+                const t = latestTransforms.current.get(selectedImageId!)
+                const cur = t?.rotation || [0, 0, 0]
+                setSnapRotationTrigger(prev => ({ rotation: [cur[0], cur[1], cur[2] + Math.PI / 2], counter: prev.counter + 1 }))
+              }}
+              title="Rotate +90° on Z axis"
+            >
+              Z+
+            </button>
+            <button
+              className="snap-rotation-btn"
+              onClick={() => {
+                const t = latestTransforms.current.get(selectedImageId!)
+                const cur = t?.rotation || [0, 0, 0]
+                setSnapRotationTrigger(prev => ({ rotation: [cur[0], cur[1], cur[2] - Math.PI / 2], counter: prev.counter + 1 }))
+              }}
+              title="Rotate -90° on Z axis"
+            >
+              Z-
+            </button>
+          </div>
           {dialogOpen && selectedImageId != null && characterIds.has(selectedImageId) && (
             <div className="dialog-editor">
               <div className="dialog-editor-header">
@@ -1032,6 +1166,9 @@ function App() {
           )}
           <button className="accept-placement-btn" onClick={handleAcceptPlacement}>
             Accept Placement
+          </button>
+          <button className="duplicate-object-btn" onClick={handleDuplicateObject}>
+            Duplicate
           </button>
           <button className="remove-object-btn" onClick={handleRemoveObject}>
             Remove

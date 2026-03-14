@@ -1139,6 +1139,31 @@
   transform: scale(0.97);
 }
 
+.duplicate-object-btn {
+  background: transparent;
+  border: 1px solid #a78bfa;
+  color: #a78bfa;
+  padding: 0.5rem 2rem;
+  border-radius: 2px;
+  font-family: 'Syne', sans-serif;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.3s;
+  box-shadow: 0 0 20px rgba(167, 139, 250, 0.1);
+}
+
+.duplicate-object-btn:hover {
+  background: rgba(167, 139, 250, 0.15);
+  box-shadow: 0 0 30px rgba(167, 139, 250, 0.25);
+}
+
+.duplicate-object-btn:active {
+  transform: scale(0.97);
+}
+
 .remove-object-btn {
   background: transparent;
   border: 1px solid #ff4d6a;
