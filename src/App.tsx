@@ -22,6 +22,7 @@ interface AcceptedImage {
   scale?: [number, number, number];
   billboard?: boolean;
   character?: boolean;
+  radius?: number;
 }
 
 const HOLD_DURATION = 2000
@@ -44,6 +45,12 @@ function App() {
   const [gallerySearch, setGallerySearch] = useState('')
   const [dialogEntries, setDialogEntries] = useState<DialogEntry[]>([])
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [characterRadii, setCharacterRadii] = useState<Map<number, number>>(new Map())
+
+  // Dialog playback state (triggered by proximity)
+  const [activeDialog, setActiveDialog] = useState<DialogEntry[]>([])
+  const [activeDialogIndex, setActiveDialogIndex] = useState(0)
+  const [activeDialogCharId, setActiveDialogCharId] = useState<number | null>(null)
 
   // Hold-to-select state
   const [holdTarget, setHoldTarget] = useState<number | null>(null)
@@ -67,6 +74,9 @@ function App() {
           setAcceptedImages(data)
           setBillboardIds(new Set(data.filter((d: AcceptedImage) => d.billboard).map((d: AcceptedImage) => d.id)))
           setCharacterIds(new Set(data.filter((d: AcceptedImage) => d.character).map((d: AcceptedImage) => d.id)))
+          const radii = new Map<number, number>()
+          data.forEach((d: AcceptedImage) => { if (d.character && d.radius != null) radii.set(d.id, d.radius) })
+          setCharacterRadii(radii)
         }
       } catch (err) {
         console.error('Failed to load scene objects', err)
@@ -173,6 +183,7 @@ function App() {
               scaleX: t.scale[0], scaleY: t.scale[1], scaleZ: t.scale[2],
               billboard: billboardIds.has(selectedImageId),
               character: characterIds.has(selectedImageId),
+              radius: characterRadii.get(selectedImageId) ?? 5,
             }),
           })
           const isBillboard = billboardIds.has(selectedImageId)
@@ -182,7 +193,7 @@ function App() {
           }
           setAcceptedImages(prev => prev.map(img =>
             img.id === selectedImageId
-              ? { ...img, position: t.position, rotation: t.rotation, scale: t.scale, billboard: isBillboard, character: isCharacter }
+              ? { ...img, position: t.position, rotation: t.rotation, scale: t.scale, billboard: isBillboard, character: isCharacter, radius: characterRadii.get(selectedImageId) ?? 5 }
               : img
           ))
         } catch (err) {
@@ -194,7 +205,7 @@ function App() {
     setSelectedImageId(null)
     setDialogOpen(false)
     setDialogEntries([])
-  }, [selectedImageId, billboardIds, characterIds, dialogEntries, saveDialog])
+  }, [selectedImageId, billboardIds, characterIds, characterRadii, dialogEntries, saveDialog])
 
   const handleRemoveObject = useCallback(async () => {
     if (selectedImageId == null) return
@@ -222,9 +233,57 @@ function App() {
     setPanelOpen(prev => !prev)
   }, [])
 
+  const handleCharacterProximity = useCallback(async (characterId: number | null) => {
+    if (characterId === null) {
+      // Left radius — dismiss dialog
+      setActiveDialog([])
+      setActiveDialogIndex(0)
+      setActiveDialogCharId(null)
+      return
+    }
+    // Already showing dialog for this character
+    if (characterId === activeDialogCharId) return
+    // Fetch dialog for this character
+    try {
+      const res = await fetch(`/api/scene-objects/${characterId}/dialog`)
+      if (res.ok) {
+        const data: DialogEntry[] = await res.json()
+        const entries = data.filter(d => d.text.trim().length > 0)
+        if (entries.length > 0) {
+          setActiveDialog(entries)
+          setActiveDialogIndex(0)
+          setActiveDialogCharId(characterId)
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load character dialog', err)
+    }
+  }, [activeDialogCharId])
+
+  const advanceDialog = useCallback(() => {
+    if (activeDialog.length === 0) return
+    if (activeDialogIndex < activeDialog.length - 1) {
+      setActiveDialogIndex(prev => prev + 1)
+    } else {
+      // End of dialog
+      setActiveDialog([])
+      setActiveDialogIndex(0)
+      setActiveDialogCharId(null)
+    }
+  }, [activeDialog, activeDialogIndex])
+
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLInputElement) return
+
+      // Dialog playback: space advances dialog
+      if (activeDialog.length > 0) {
+        if (e.code === 'Space') {
+          e.preventDefault()
+          advanceDialog()
+        }
+        return
+      }
 
       if (selectionMode) {
         if (e.code === 'KeyG') setTransformMode('translate')
@@ -239,9 +298,20 @@ function App() {
         togglePanel()
       }
     }
+
+    const onClick = () => {
+      if (activeDialog.length > 0) {
+        advanceDialog()
+      }
+    }
+
     window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [togglePanel, selectionMode, handleAcceptPlacement, handleRemoveObject])
+    window.addEventListener('click', onClick)
+    return () => {
+      window.removeEventListener('keydown', onKeyDown)
+      window.removeEventListener('click', onClick)
+    }
+  }, [togglePanel, selectionMode, handleAcceptPlacement, handleRemoveObject, activeDialog, advanceDialog])
 
   const fetchGallery = async () => {
     try {
@@ -337,6 +407,9 @@ function App() {
         snapRotationTrigger={snapRotationTrigger}
         billboardIds={billboardIds}
         characterIds={characterIds}
+        characterRadii={characterRadii}
+        onCharacterProximity={handleCharacterProximity}
+        dialogActive={activeDialog.length > 0}
       />
 
       {panelOpen && (
@@ -545,6 +618,28 @@ function App() {
               </button>
             )}
           </div>
+          {selectedImageId != null && characterIds.has(selectedImageId) && (
+            <div className="character-radius-row">
+              <span className="snap-rotation-label">Radius</span>
+              <input
+                type="range"
+                className="radius-slider"
+                min="1"
+                max="20"
+                step="0.5"
+                value={characterRadii.get(selectedImageId) ?? 5}
+                onChange={(e) => {
+                  const val = parseFloat(e.target.value)
+                  setCharacterRadii(prev => {
+                    const next = new Map(prev)
+                    next.set(selectedImageId!, val)
+                    return next
+                  })
+                }}
+              />
+              <span className="radius-value">{(characterRadii.get(selectedImageId) ?? 5).toFixed(1)}</span>
+            </div>
+          )}
           <div className="snap-rotation-row">
             <span className="snap-rotation-label">Snap</span>
             <button
@@ -647,6 +742,20 @@ function App() {
           </button>
           <div className="selection-hint">
             <kbd>Enter</kbd> or <kbd>Esc</kbd> to confirm &middot; <kbd>Del</kbd> to remove
+          </div>
+        </div>
+      )}
+
+      {activeDialog.length > 0 && (
+        <div className="dialog-playback-overlay">
+          <div className="dialog-card">
+            <div className="dialog-card-text">{activeDialog[activeDialogIndex]?.text}</div>
+            <div className="dialog-card-footer">
+              <span className="dialog-card-progress">{activeDialogIndex + 1} / {activeDialog.length}</span>
+              <span className="dialog-card-hint">
+                {activeDialogIndex < activeDialog.length - 1 ? 'Press Space or Click to continue' : 'Press Space or Click to close'}
+              </span>
+            </div>
           </div>
         </div>
       )}

@@ -50,6 +50,7 @@ let db: any;
     scale_z REAL DEFAULT 1,
     billboard INTEGER DEFAULT 0,
     character INTEGER DEFAULT 0,
+    radius REAL DEFAULT 5,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )`);
 
@@ -62,6 +63,11 @@ let db: any;
   // Migration: add character column if missing
   if (!cols.some((c: any) => c.name === 'character')) {
     await db.exec("ALTER TABLE scene_objects ADD COLUMN character INTEGER DEFAULT 0");
+  }
+
+  // Migration: add radius column if missing
+  if (!cols.some((c: any) => c.name === 'radius')) {
+    await db.exec("ALTER TABLE scene_objects ADD COLUMN radius REAL DEFAULT 5");
   }
 
   // Create character_dialog table
@@ -191,7 +197,7 @@ app.post(
 app.get("/api/scene-objects", async (req: Request, res: Response) => {
   try {
     const rows = await db.all(
-      "SELECT id, image_id, position_x, position_y, position_z, rotation_x, rotation_y, rotation_z, scale_x, scale_y, scale_z, billboard, character FROM scene_objects ORDER BY created_at ASC",
+      "SELECT id, image_id, position_x, position_y, position_z, rotation_x, rotation_y, rotation_z, scale_x, scale_y, scale_z, billboard, character, radius FROM scene_objects ORDER BY created_at ASC",
     );
     const objects = rows.map((r: any) => ({
       id: r.id,
@@ -202,6 +208,7 @@ app.get("/api/scene-objects", async (req: Request, res: Response) => {
       scale: [r.scale_x, r.scale_y, r.scale_z],
       billboard: !!r.billboard,
       character: !!r.character,
+      radius: r.radius ?? 5,
     }));
     res.json(objects);
   } catch (error) {
@@ -241,6 +248,7 @@ app.put(
         scaleX, scaleY, scaleZ,
         billboard,
         character,
+        radius,
       } = req.body;
       await db.run(
         `UPDATE scene_objects SET
@@ -248,9 +256,10 @@ app.put(
           rotation_x = ?, rotation_y = ?, rotation_z = ?,
           scale_x = ?, scale_y = ?, scale_z = ?,
           billboard = ?,
-          character = ?
+          character = ?,
+          radius = ?
         WHERE id = ?`,
-        [positionX, positionY, positionZ, rotationX, rotationY, rotationZ, scaleX, scaleY, scaleZ, billboard ? 1 : 0, character ? 1 : 0, id],
+        [positionX, positionY, positionZ, rotationX, rotationY, rotationZ, scaleX, scaleY, scaleZ, billboard ? 1 : 0, character ? 1 : 0, radius ?? 5, id],
       );
       res.json({ ok: true });
     } catch (error) {

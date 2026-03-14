@@ -1240,3 +1240,113 @@
   border-color: var(--forge-gold);
   box-shadow: 0 0 12px var(--forge-glow);
 }
+
+/* ─── Character Radius Slider ─── */
+.character-radius-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.radius-slider {
+  flex: 1;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  background: var(--forge-border);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+
+.radius-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--forge-gold);
+  cursor: pointer;
+  box-shadow: 0 0 8px var(--forge-glow);
+}
+
+.radius-slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--forge-gold);
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 0 8px var(--forge-glow);
+}
+
+.radius-value {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.7rem;
+  color: var(--forge-text-dim);
+  min-width: 2rem;
+  text-align: right;
+}
+
+/* ─── Dialog Playback Card ─── */
+.dialog-playback-overlay {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 20;
+  display: flex;
+  justify-content: center;
+  padding: 2rem;
+  pointer-events: none;
+  animation: hud-appear 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.dialog-card {
+  background: var(--forge-surface);
+  backdrop-filter: blur(24px);
+  border: 1px solid var(--forge-border);
+  border-radius: 6px;
+  padding: 1.25rem 1.5rem;
+  max-width: 600px;
+  width: 100%;
+  pointer-events: auto;
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.5),
+    0 0 60px -10px var(--forge-glow),
+    inset 0 1px 0 rgba(255, 248, 235, 0.04);
+}
+
+.dialog-card-text {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 1.05rem;
+  line-height: 1.6;
+  color: var(--forge-text);
+  margin-bottom: 0.75rem;
+}
+
+.dialog-card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.dialog-card-progress {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.7rem;
+  color: var(--forge-gold);
+  letter-spacing: 0.05em;
+}
+
+.dialog-card-hint {
+  font-family: 'Syne', sans-serif;
+  font-size: 0.68rem;
+  color: var(--forge-text-muted);
+  letter-spacing: 0.04em;
+  animation: dialog-hint-pulse 2s ease-in-out infinite;
+}
+
+@keyframes dialog-hint-pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.8; }
+}

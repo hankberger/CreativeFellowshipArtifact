@@ -617,6 +617,65 @@ function SelectionModeControls({
   )
 }
 
+function ProximityDetector({
+  acceptedImages,
+  characterIds,
+  characterRadii,
+  onCharacterProximity,
+  disabled,
+}: {
+  acceptedImages: AcceptedImage[]
+  characterIds: Set<number>
+  characterRadii: Map<number, number>
+  onCharacterProximity: (characterId: number | null) => void
+  disabled: boolean
+}) {
+  const { camera, scene } = useThree()
+  const currentCharRef = useRef<number | null>(null)
+  const onCharacterProximityRef = useRef(onCharacterProximity)
+  onCharacterProximityRef.current = onCharacterProximity
+
+  useFrame(() => {
+    if (disabled) return
+
+    const playerPos = camera.position
+    let closestId: number | null = null
+    let closestDist = Infinity
+
+    // Check distance to each character
+    for (const img of acceptedImages) {
+      if (!characterIds.has(img.id)) continue
+      // Find the object in scene to get its current world position
+      let objPos: THREE.Vector3 | null = null
+      scene.traverse((obj) => {
+        if (obj.userData.imageId === img.id) {
+          objPos = new THREE.Vector3()
+          obj.getWorldPosition(objPos)
+        }
+      })
+      if (!objPos) continue
+
+      // XZ distance only (ignore vertical)
+      const dx = playerPos.x - (objPos as THREE.Vector3).x
+      const dz = playerPos.z - (objPos as THREE.Vector3).z
+      const dist = Math.sqrt(dx * dx + dz * dz)
+      const radius = characterRadii.get(img.id) ?? 5
+
+      if (dist <= radius && dist < closestDist) {
+        closestDist = dist
+        closestId = img.id
+      }
+    }
+
+    if (closestId !== currentCharRef.current) {
+      currentCharRef.current = closestId
+      onCharacterProximityRef.current(closestId)
+    }
+  })
+
+  return null
+}
+
 interface ThreeSceneProps {
   panelOpen: boolean
   acceptedImages: AcceptedImage[]
@@ -630,6 +689,9 @@ interface ThreeSceneProps {
   snapRotationTrigger: { rotation: [number, number, number]; counter: number }
   billboardIds: Set<number>
   characterIds: Set<number>
+  characterRadii: Map<number, number>
+  onCharacterProximity: (characterId: number | null) => void
+  dialogActive: boolean
 }
 
 export default function ThreeScene({
@@ -645,6 +707,9 @@ export default function ThreeScene({
   snapRotationTrigger,
   billboardIds,
   characterIds,
+  characterRadii,
+  onCharacterProximity,
+  dialogActive,
 }: ThreeSceneProps) {
   return (
     <Canvas
@@ -654,10 +719,17 @@ export default function ThreeScene({
       <Environment files="/sky.hdr" background environmentIntensity={0.08} backgroundIntensity={0.25} />
       <ambientLight intensity={0.5} />
       <pointLight position={[10, 10, 10]} />
-      <JsonControls disabled={panelOpen || selectionMode} />
-      <FirstPersonMovement disabled={panelOpen || selectionMode} />
+      <JsonControls disabled={panelOpen || selectionMode || dialogActive} />
+      <FirstPersonMovement disabled={panelOpen || selectionMode || dialogActive} />
       <CameraStateSaver selectionMode={selectionMode} />
-      <HoldToSelect disabled={selectionMode} onHoldStart={onHoldStart} onHoldEnd={onHoldEnd} />
+      <HoldToSelect disabled={selectionMode || dialogActive} onHoldStart={onHoldStart} onHoldEnd={onHoldEnd} />
+      <ProximityDetector
+        acceptedImages={acceptedImages}
+        characterIds={characterIds}
+        characterRadii={characterRadii}
+        onCharacterProximity={onCharacterProximity}
+        disabled={selectionMode || panelOpen}
+      />
       {selectionMode && (
         <SelectionModeControls
           selectedImageId={selectedImageId}
