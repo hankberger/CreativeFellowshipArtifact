@@ -109,7 +109,7 @@ let db: any;
 const app = express();
 const port = process.env.PORT || 3000;
 
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
 // When compiled, this file will be in dist-server/, so we go up one directory to find dist/
 app.use(express.static(path.join(projectRoot, "dist")));
 app.use("/images", express.static(path.join(projectRoot, "data", "images")));
@@ -132,15 +132,31 @@ app.post(
   "/api/generate-image",
   async (req: Request, res: Response): Promise<any> => {
     try {
-      const { prompt } = req.body;
+      const { prompt, referenceImages } = req.body;
       if (!prompt) {
         return res.status(400).json({ error: "Prompt is required" });
       }
 
       const finalPrompt = `${prompt}, isolated on a solid bright green chroma key (#00FF00) background with no shadows, no gradients, no floor, and no reflections. The subject should have clean, sharp edges with no green or light-colored fringing. Studio product photography style with flat even lighting.`;
+
+      // Build contents array with optional reference images
+      const contents: any[] = [{ text: finalPrompt }];
+      if (referenceImages && Array.isArray(referenceImages)) {
+        for (const img of referenceImages.slice(0, 3)) {
+          if (img.mimeType && img.data) {
+            contents.push({
+              inlineData: {
+                mimeType: img.mimeType,
+                data: img.data,
+              },
+            });
+          }
+        }
+      }
+
       const response = await ai.models.generateContent({
         model: "gemini-3.1-flash-image-preview",
-        contents: finalPrompt,
+        contents: contents,
       });
 
       let base64Image = null;

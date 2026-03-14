@@ -342,7 +342,7 @@ function ImagePlane({
   })
 
   return (
-    <group ref={groupRef} userData={{ imageId: id }}>
+    <group ref={groupRef} userData={{ imageId: id }} position={savedPosition || [0, 0, 0]}>
       {texture && (
         <>
           <mesh>

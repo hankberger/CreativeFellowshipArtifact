@@ -72,7 +72,7 @@ interface AcceptedImage {
 const HOLD_DURATION = 2000
 
 function App() {
-  const [prompt, setPrompt] = useState('Create a picture of a nano banana dish in a fancy restaurant with a Gemini theme')
+  const [prompt, setPrompt] = useState('A cathedral made entirely of ice, with colored light refracting through its translucent walls')
   const [imageUrl, setImageUrl] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -87,6 +87,8 @@ function App() {
   const [billboardIds, setBillboardIds] = useState<Set<number>>(new Set())
   const [characterIds, setCharacterIds] = useState<Set<number>>(new Set())
   const [gallerySearch, setGallerySearch] = useState('')
+  const [referenceImages, setReferenceImages] = useState<{ file: File; preview: string }[]>([])
+  const refImageInputRef = useRef<HTMLInputElement>(null)
   const [dialogEntries, setDialogEntries] = useState<DialogEntry[]>([])
   const [dialogOpen, setDialogOpen] = useState(false)
   const [characterRadii, setCharacterRadii] = useState<Map<number, number>>(new Map())
@@ -418,12 +420,22 @@ function App() {
     setImageUrl(null)
 
     try {
+      // Convert reference images to base64
+      const refImagesBase64: { mimeType: string; data: string }[] = []
+      for (const ref of referenceImages) {
+        const arrayBuffer = await ref.file.arrayBuffer()
+        const base64 = btoa(
+          new Uint8Array(arrayBuffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
+        )
+        refImagesBase64.push({ mimeType: ref.file.type, data: base64 })
+      }
+
       const response = await fetch('/api/generate-image', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ prompt }),
+        body: JSON.stringify({ prompt, referenceImages: refImagesBase64 }),
       })
 
       if (!response.ok) {
@@ -517,6 +529,56 @@ function App() {
               rows={4}
             />
             <div className="prompt-char-count">{prompt.length} chars</div>
+
+            <div className="panel-form-label">Reference images (optional, up to 3)</div>
+            <div className="ref-images-section">
+              <div className="ref-images-grid">
+                {referenceImages.map((ref, i) => (
+                  <div key={i} className="ref-image-thumb">
+                    <img src={ref.preview} alt={`Reference ${i + 1}`} />
+                    <button
+                      type="button"
+                      className="ref-image-remove"
+                      onClick={() => {
+                        URL.revokeObjectURL(ref.preview)
+                        setReferenceImages(prev => prev.filter((_, idx) => idx !== i))
+                      }}
+                    >
+                      &times;
+                    </button>
+                  </div>
+                ))}
+                {referenceImages.length < 3 && (
+                  <button
+                    type="button"
+                    className="ref-image-add"
+                    onClick={() => refImageInputRef.current?.click()}
+                  >
+                    +
+                  </button>
+                )}
+              </div>
+              <input
+                ref={refImageInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                style={{ display: 'none' }}
+                onChange={(e) => {
+                  const files = e.target.files
+                  if (!files) return
+                  const remaining = 3 - referenceImages.length
+                  const newFiles = Array.from(files).slice(0, remaining)
+                  const newRefs = newFiles.map(file => ({
+                    file,
+                    preview: URL.createObjectURL(file),
+                  }))
+                  setReferenceImages(prev => [...prev, ...newRefs])
+                  e.target.value = ''
+                }}
+                multiple
+              />
+            </div>
+
             <button
               type="submit"
               disabled={loading || !prompt.trim()}
