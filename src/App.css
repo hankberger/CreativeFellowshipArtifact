@@ -746,6 +746,61 @@
   line-height: 1.4;
 }
 
+/* ─── Gallery Remix Button ─── */
+.gallery-item-img-wrapper {
+  position: relative;
+}
+
+.gallery-remix-btn {
+  position: absolute;
+  bottom: 6px;
+  right: 6px;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--forge-border);
+  border-radius: 3px;
+  background: rgba(12, 11, 15, 0.85);
+  color: var(--forge-gold);
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.2s, width 0.2s, background 0.2s;
+  overflow: hidden;
+  white-space: nowrap;
+  z-index: 2;
+}
+
+.gallery-item:hover .gallery-remix-btn {
+  opacity: 1;
+}
+
+.gallery-remix-label {
+  display: none;
+  font-family: 'Syne', sans-serif;
+  font-size: 0.6rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-left: 2px;
+}
+
+.gallery-remix-btn:hover {
+  width: 64px;
+  background: rgba(232, 168, 73, 0.15);
+  border-color: var(--forge-gold);
+}
+
+.gallery-remix-btn:hover .gallery-remix-label {
+  display: inline;
+}
+
+.gallery-remix-btn:active {
+  transform: scale(0.95);
+}
+
 /* Panel Scrollbar */
 .floating-panel::-webkit-scrollbar {
   width: 4px;

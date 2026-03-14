@@ -530,7 +530,6 @@ function App() {
             />
             <div className="prompt-char-count">{prompt.length} chars</div>
 
-            <div className="panel-form-label">Reference images (optional, up to 3)</div>
             <div className="ref-images-section">
               <div className="ref-images-grid">
                 {referenceImages.map((ref, i) => (
@@ -686,10 +685,34 @@ function App() {
                       }
                     }}
                   >
-                    <img
-                      src={`/images/${img.id}.webp`}
-                      alt={img.prompt || `Generated at ${img.created_at}`}
-                    />
+                    <div className="gallery-item-img-wrapper">
+                      <img
+                        src={`/images/${img.id}.webp`}
+                        alt={img.prompt || `Generated at ${img.created_at}`}
+                      />
+                      {referenceImages.length < 3 && (
+                        <button
+                          className="gallery-remix-btn"
+                          onClick={async (e) => {
+                            e.stopPropagation()
+                            try {
+                              const resp = await fetch(`/images/${img.id}.webp`)
+                              const blob = await resp.blob()
+                              const file = new File([blob], `${img.id}.webp`, { type: 'image/webp' })
+                              setReferenceImages(prev => {
+                                if (prev.length >= 3) return prev
+                                return [...prev, { file, preview: URL.createObjectURL(blob) }]
+                              })
+                            } catch (err) {
+                              console.error('Failed to add as reference', err)
+                            }
+                          }}
+                        >
+                          <span className="gallery-remix-arrow">&gt;</span>
+                          <span className="gallery-remix-label">Remix</span>
+                        </button>
+                      )}
+                    </div>
                     <p className="gallery-item-title">{img.prompt || 'Untitled'}</p>
                     <p>{new Date(img.created_at).toLocaleString()}</p>
                   </div>

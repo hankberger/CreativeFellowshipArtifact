@@ -1,0 +1,290 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000" width="100%" height="100%" style="background-color: #05020A; font-family: sans-serif;">
+  <defs>
+    <!-- Glow Filters -->
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="12" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+    <filter id="softGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="25" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+    <filter id="waterGlow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="8" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+
+    <!-- Gradients -->
+    <radialGradient id="bgGrad" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#1A0B33" />
+      <stop offset="100%" stop-color="#05020A" />
+    </radialGradient>
+    
+    <radialGradient id="moonGrad" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#FF006A" stop-opacity="0.15" />
+      <stop offset="50%" stop-color="#5B00FF" stop-opacity="0.05" />
+      <stop offset="100%" stop-color="#00F0FF" stop-opacity="0" />
+    </radialGradient>
+
+    <radialGradient id="portalSpace" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#FFFFFF" />
+      <stop offset="15%" stop-color="#00F0FF" />
+      <stop offset="45%" stop-color="#B000FF" />
+      <stop offset="80%" stop-color="#1A0B2E" />
+      <stop offset="100%" stop-color="#05020A" />
+    </radialGradient>
+
+    <linearGradient id="portalRingGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00F0FF" />
+      <stop offset="50%" stop-color="#FF006A" />
+      <stop offset="100%" stop-color="#B000FF" />
+    </linearGradient>
+
+    <linearGradient id="waterGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#00F0FF" stop-opacity="0.9" />
+      <stop offset="50%" stop-color="#00F0FF" stop-opacity="0.5" />
+      <stop offset="100%" stop-color="#00F0FF" stop-opacity="0" />
+    </linearGradient>
+
+    <linearGradient id="balloonGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FF006A" />
+      <stop offset="100%" stop-color="#FFB300" />
+    </linearGradient>
+
+    <!-- Star Symbol -->
+    <g id="star">
+      <polygon points="0,-6 1,-1 6,0 1,1 0,6 -1,1 -6,0 -1,-1" fill="#FFFFFF" filter="url(#glow)"/>
+    </g>
+    <g id="sparkle">
+      <circle cx="0" cy="0" r="2" fill="#00F0FF" filter="url(#glow)"/>
+    </g>
+  </defs>
+
+  <!-- Deep Cosmic Background -->
+  <rect width="100%" height="100%" fill="url(#bgGrad)" />
+  <circle cx="500" cy="450" r="450" fill="url(#moonGrad)" filter="url(#softGlow)" />
+
+  <!-- Background Stars & Constellations -->
+  <use href="#star" x="150" y="150" transform="scale(0.8)" />
+  <use href="#star" x="800" y="120" transform="scale(1.2)" />
+  <use href="#star" x="880" y="350" transform="scale(0.6)" />
+  <use href="#star" x="100" y="450" transform="scale(0.9)" />
+  <use href="#star" x="250" y="850" transform="scale(1.1)" />
+  <use href="#star" x="850" y="750" transform="scale(0.7)" />
+  <use href="#star" x="450" y="80" transform="scale(0.5)" />
+  <circle cx="200" cy="200" r="1.5" fill="#FFF" opacity="0.5"/>
+  <circle cx="220" cy="180" r="1" fill="#FFF" opacity="0.3"/>
+  <circle cx="750" cy="250" r="2" fill="#FFF" opacity="0.6"/>
+  <circle cx="780" cy="280" r="1" fill="#FFF" opacity="0.4"/>
+  <circle cx="120" cy="650" r="1.5" fill="#FFF" opacity="0.5"/>
+  <circle cx="900" cy="600" r="2" fill="#FFF" opacity="0.7"/>
+
+  <!-- Orbital Rings -->
+  <ellipse cx="500" cy="520" rx="420" ry="140" fill="none" stroke="#00F0FF" stroke-width="1.5" stroke-dasharray="4 12" opacity="0.4" transform="rotate(-8 500 520)" />
+  <ellipse cx="500" cy="520" rx="440" ry="160" fill="none" stroke="#FF006A" stroke-width="1" stroke-dasharray="1 8" opacity="0.3" transform="rotate(-8 500 520)" />
+
+  <!-- ========================================== -->
+  <!-- FLOATING ISLAND STRUCTURE (Isometric 3D)   -->
+  <!-- ========================================== -->
+  <g id="island">
+    <!-- Bottom Crystals -->
+    <!-- Center Crystal -->
+    <polygon points="500,690 420,740 500,940" fill="#20084A" />
+    <polygon points="500,690 580,740 500,940" fill="#13042E" />
+    <!-- Left Crystal -->
+    <polygon points="350,615 300,670 400,850 420,720" fill="#311068" />
+    <polygon points="420,720 400,850 480,750" fill="#20084A" />
+    <!-- Right Crystal -->
+    <polygon points="580,720 600,850 650,615" fill="#20084A" />
+    <polygon points="650,615 600,850 700,670" fill="#13042E" />
+    <!-- Front Small Crystal -->
+    <polygon points="460,720 440,760 490,820 500,750" fill="#4E1A9E" />
+    <polygon points="500,750 490,820 530,760" fill="#311068" />
+
+    <!-- TIER 1 (Base - Cyan) -->
+    <!-- Surfaces -->
+    <polygon points="200,500 500,350 800,500 500,650" fill="#00C3FF" />
+    <polygon points="200,500 500,650 500,690 200,540" fill="#130729" />
+    <polygon points="500,650 800,500 800,540 500,690" fill="#0A0314" />
+    <!-- Isometric Grid on Tier 1 for Web3/Creative Vibe -->
+    <polyline points="350,425 450,475 350,525" fill="none" stroke="#FFFFFF" stroke-width="1" opacity="0.3" />
+    <polyline points="650,425 550,475 650,525" fill="none" stroke="#FFFFFF" stroke-width="1" opacity="0.3" />
+    <line x1="500" y1="350" x2="500" y2="650" stroke="#FFFFFF" stroke-width="1" opacity="0.2" />
+
+    <!-- TIER 2 (Middle - Magenta) -->
+    <polygon points="300,480 500,380 700,480 500,580" fill="#D000FF" />
+    <polygon points="300,480 500,580 500,610 300,510" fill="#2D115C" />
+    <polygon points="500,580 700,480 700,510 500,610" fill="#1C0A3B" />
+
+    <!-- TIER 3 (Top - Pink) -->
+    <polygon points="400,450 500,400 600,450 500,500" fill="#FF006A" />
+    <polygon points="400,450 500,500 500,520 400,470" fill="#4A1666" />
+    <polygon points="500,500 600,450 600,470 500,520" fill="#320C4A" />
+
+    <!-- Glowing Trim Lines along edges -->
+    <polyline points="200,500 500,650 800,500" fill="none" stroke="#00F0FF" stroke-width="2" filter="url(#glow)" />
+    <polyline points="300,480 500,580 700,480" fill="none" stroke="#FF00FF" stroke-width="2" filter="url(#glow)" />
+    <polyline points="400,450 500,500 600,450" fill="none" stroke="#FFD700" stroke-width="2" filter="url(#glow)" />
+  </g>
+
+  <!-- ========================================== -->
+  <!-- WATERFALL (Magic Cyber-Flow)               -->
+  <!-- ========================================== -->
+  <!-- Spilling off Tier 1 left edge -->
+  <g id="waterfall">
+    <!-- River surface on Tier 1 -->
+    <polygon points="280,560 340,590 355,582 295,552" fill="#00F0FF" filter="url(#waterGlow)" />
+    <!-- Falling water -->
+    <polygon points="280,560 340,590 340,950 280,900" fill="url(#waterGrad)" />
+    <!-- Waterfall Motion Lines -->
+    <line x1="290" y1="570" x2="290" y2="850" stroke="#FFFFFF" stroke-width="2" opacity="0.6" stroke-dasharray="10 15" />
+    <line x1="310" y1="580" x2="310" y2="900" stroke="#FFFFFF" stroke-width="1.5" opacity="0.4" stroke-dasharray="20 20" />
+    <line x1="330" y1="590" x2="330" y2="870" stroke="#FFFFFF" stroke-width="2" opacity="0.5" stroke-dasharray="5 10" />
+    <!-- Splash Rings -->
+    <ellipse cx="310" cy="880" rx="40" ry="12" fill="none" stroke="#00F0FF" stroke-width="3" opacity="0.8" filter="url(#glow)" />
+    <ellipse cx="310" cy="880" rx="60" ry="18" fill="none" stroke="#00F0FF" stroke-width="1" opacity="0.4" />
+    <circle cx="280" cy="870" r="4" fill="#FFF" filter="url(#glow)" />
+    <circle cx="340" cy="890" r="3" fill="#FFF" filter="url(#glow)" />
+    <circle cx="310" cy="860" r="2" fill="#FFF" filter="url(#glow)" />
+  </g>
+
+  <!-- ========================================== -->
+  <!-- THE PORTAL (Whimsical Gateway)             -->
+  <!-- ========================================== -->
+  <g id="portal">
+    <!-- Pedestal Base -->
+    <ellipse cx="500" cy="460" rx="80" ry="35" fill="#1C0B3B" stroke="#00F0FF" stroke-width="2" />
+    <ellipse cx="500" cy="455" rx="70" ry="30" fill="#311068" />
+    
+    <!-- Portal Inner Cosmos -->
+    <circle cx="500" cy="280" r="140" fill="url(#portalSpace)" />
+    <!-- Swirling Galaxy Lines inside Portal -->
+    <path d="M 400,280 C 400,200 600,360 600,280" fill="none" stroke="#FFFFFF" stroke-width="3" opacity="0.7" filter="url(#glow)" />
+    <path d="M 430,180 C 500,280 400,380 550,380" fill="none" stroke="#00F0FF" stroke-width="2" opacity="0.5" filter="url(#glow)" />
+    <circle cx="480" cy="250" r="2" fill="#FFF" filter="url(#glow)" />
+    <circle cx="530" cy="310" r="3" fill="#FFF" filter="url(#glow)" />
+    <circle cx="450" cy="330" r="1.5" fill="#FFF" filter="url(#glow)" />
+
+    <!-- Outer Glowing Rings -->
+    <circle cx="500" cy="280" r="140" fill="none" stroke="url(#portalRingGrad)" stroke-width="12" filter="url(#glow)" />
+    <circle cx="500" cy="280" r="145" fill="none" stroke="#FFFFFF" stroke-width="2" opacity="0.8" />
+    <circle cx="500" cy="280" r="135" fill="none" stroke="#FFFFFF" stroke-width="1" opacity="0.5" />
+
+    <!-- Floating Runes / Geometry around portal -->
+    <rect x="300" y="220" width="12" height="40" rx="4" fill="#00F0FF" transform="rotate(15 300 220)" filter="url(#glow)" />
+    <rect x="670" y="260" width="10" height="35" rx="3" fill="#FF006A" transform="rotate(-20 670 260)" filter="url(#glow)" />
+    <rect x="470" y="80" width="45" height="12" rx="4" fill="#B000FF" filter="url(#glow)" />
+    <circle cx="330" cy="140" r="6" fill="#00F0FF" filter="url(#glow)" />
+    <circle cx="650" cy="160" r="8" fill="#FF006A" filter="url(#glow)" />
+  </g>
+
+  <!-- ========================================== -->
+  <!-- WHIMSICAL TREES & FLORA                    -->
+  <!-- ========================================== -->
+  <!-- Tree Group Right (Tier 1) -->
+  <g id="tree-right">
+    <!-- Trunk -->
+    <polygon points="680,485 690,485 685,450" fill="#1C0A3B" />
+    <!-- Leaves (Overlapping Orbs) -->
+    <circle cx="685" cy="440" r="22" fill="#00F0FF" opacity="0.9" filter="url(#waterGlow)" />
+    <circle cx="670" cy="450" r="15" fill="#00C3FF" opacity="0.8" />
+    <circle cx="700" cy="450" r="15" fill="#00C3FF" opacity="0.8" />
+    <circle cx="680" cy="435" r="5" fill="#FFF" opacity="0.5" />
+  </g>
+
+  <!-- Tree Group Left (Tier 2) -->
+  <g id="tree-left">
+    <polygon points="350,505 360,505 355,460" fill="#1C0A3B" />
+    <circle cx="355" cy="450" r="26" fill="#FF006A" opacity="0.9" filter="url(#waterGlow)" />
+    <circle cx="335" cy="465" r="18" fill="#FF00A0" opacity="0.8" />
+    <circle cx="375" cy="465" r="18" fill="#FF00A0" opacity="0.8" />
+    <circle cx="350" cy="440" r="6" fill="#FFF" opacity="0.5" />
+  </g>
+
+  <!-- Mini Trees -->
+  <g id="tree-mini-1">
+    <polygon points="620,440 626,440 623,420" fill="#1C0A3B" />
+    <circle cx="623" cy="415" r="12" fill="#B000FF" opacity="0.9" filter="url(#waterGlow)" />
+  </g>
+  <g id="tree-mini-2">
+    <polygon points="410,480 416,480 413,460" fill="#1C0A3B" />
+    <circle cx="413" cy="455" r="14" fill="#00F0FF" opacity="0.9" filter="url(#waterGlow)" />
+  </g>
+
+  <!-- ========================================== -->
+  <!-- FLOATING STEPPING STONES (Isometric Path)  -->
+  <!-- ========================================== -->
+  <g id="stepping-stones">
+    <!-- Stone 1 (Bottom) -->
+    <polygon points="60,670 100,650 140,670 100,690" fill="#00F0FF" />
+    <polygon points="60,670 100,690 100,710 60,690" fill="#0A5B7A" />
+    <polygon points="100,690 140,670 140,690 100,710" fill="#06394D" />
+    <!-- Stone 2 -->
+    <polygon points="120,610 160,590 200,610 160,630" fill="#00C3FF" />
+    <polygon points="120,610 160,630 160,650 120,630" fill="#0A5B7A" />
+    <polygon points="160,630 200,610 200,630 160,650" fill="#06394D" />
+    <!-- Stone 3 -->
+    <polygon points="180,550 220,530 260,550 220,570" fill="#00F0FF" />
+    <polygon points="180,550 220,570 220,590 180,570" fill="#0A5B7A" />
+    <polygon points="220,570 260,550 260,570 220,590" fill="#06394D" />
+  </g>
+
+  <!-- ========================================== -->
+  <!-- HOT AIR BALLOON                            -->
+  <!-- ========================================== -->
+  <g id="balloon" transform="translate(180, 240)">
+    <!-- Balloon Basket -->
+    <path d="M -12,65 L 12,65 L 10,80 L -10,80 Z" fill="#D29B44" />
+    <path d="M -12,65 L 12,65 L 12,68 L -12,68 Z" fill="#B37D2E" />
+    <!-- Ropes -->
+    <line x1="-8" y1="45" x2="-10" y2="65" stroke="#FFFFFF" stroke-width="1.5" />
+    <line x1="8" y1="45" x2="10" y2="65" stroke="#FFFFFF" stroke-width="1.5" />
+    <!-- Flame/Engine Glow -->
+    <polygon points="-3,55 3,55 0,45" fill="#00F0FF" filter="url(#glow)" />
+    <!-- Balloon Envelope -->
+    <path d="M 0,-40 C -50,-40 -50,20 -15,45 L 15,45 C 50,20 50,-40 0,-40 Z" fill="url(#balloonGrad)" />
+    <!-- Envelope Stripes (Decorative) -->
+    <path d="M 0,-40 C -20,-40 -20,20 -5,45" fill="none" stroke="#FFFFFF" stroke-width="3" opacity="0.4" />
+    <path d="M 0,-40 C 20,-40 20,20 5,45" fill="none" stroke="#FFFFFF" stroke-width="3" opacity="0.4" />
+  </g>
+
+  <!-- Small distant balloon -->
+  <g id="balloon-small" transform="translate(850, 350) scale(0.5)">
+    <path d="M -12,65 L 12,65 L 10,80 L -10,80 Z" fill="#D29B44" />
+    <line x1="-8" y1="45" x2="-10" y2="65" stroke="#FFFFFF" stroke-width="2" />
+    <line x1="8" y1="45" x2="10" y2="65" stroke="#FFFFFF" stroke-width="2" />
+    <path d="M 0,-40 C -50,-40 -50,20 -15,45 L 15,45 C 50,20 50,-40 0,-40 Z" fill="#00F0FF" />
+  </g>
+
+  <!-- ========================================== -->
+  <!-- MAGICAL ATMOSPHERE & PARTICLES             -->
+  <!-- ========================================== -->
+  <!-- Glowing Orbs / Fireflies -->
+  <use href="#sparkle" x="350" y="350" transform="scale(1.5)" />
+  <use href="#sparkle" x="600" y="550" transform="scale(2)" />
+  <use href="#sparkle" x="420" y="580" transform="scale(1.2)" />
+  <use href="#sparkle" x="550" y="680" transform="scale(1.8)" />
+  <use href="#sparkle" x="250" y="480" transform="scale(1.4)" />
+  <use href="#sparkle" x="720" y="420" transform="scale(1.6)" />
+  
+  <!-- Additional specific colored orbs -->
+  <circle cx="480" cy="180" r="4" fill="#FF006A" filter="url(#glow)" />
+  <circle cx="580" cy="220" r="5" fill="#B000FF" filter="url(#glow)" />
+  <circle cx="400" cy="680" r="3" fill="#00F0FF" filter="url(#glow)" />
+  <circle cx="750" cy="600" r="6" fill="#FF006A" filter="url(#glow)" />
+
+  <!-- Foreground Cloud Whisps (To frame the 3D scene) -->
+  <path d="M -50,900 C 150,850 300,950 500,900 C 700,850 850,950 1050,900 L 1050,1050 L -50,1050 Z" fill="#0A0314" opacity="0.8" />
+  <path d="M -50,950 C 200,900 400,1000 600,950 C 800,900 950,1000 1050,950 L 1050,1050 L -50,1050 Z" fill="#05020A" />
+
+</svg>
