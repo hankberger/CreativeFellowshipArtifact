@@ -206,6 +206,7 @@ function ImagePlane({
   url, id, selected,
   savedPosition, savedRotation, savedScale,
   onTransformUpdate, billboard, character,
+  speakingImageUrl, isSpeaking,
 }: {
   url: string; id: number; selected: boolean;
   savedPosition?: [number, number, number];
@@ -214,14 +215,19 @@ function ImagePlane({
   onTransformUpdate?: (id: number, position: [number, number, number], rotation: [number, number, number], scale: [number, number, number]) => void;
   billboard?: boolean;
   character?: boolean;
+  speakingImageUrl?: string | null;
+  isSpeaking?: boolean;
 }) {
   const groupRef = useRef<THREE.Group>(null!)
   const chatBubbleRef = useRef<THREE.Group>(null!)
   const { camera } = useThree()
   const [texture, setTexture] = useState<THREE.Texture | null>(null)
   const [chatBubbleTexture, setChatBubbleTexture] = useState<THREE.Texture | null>(null)
+  const [speakingTexture, setSpeakingTexture] = useState<THREE.Texture | null>(null)
+  const [showSpeakingFrame, setShowSpeakingFrame] = useState(false)
   const [planeSize, setPlaneSize] = useState<[number, number]>([2, 2])
   const initialized = useRef(false)
+  const speakingImageUrlRef = useRef(speakingImageUrl)
 
   // Load chatbubble texture when character flag is set
   useEffect(() => {
@@ -232,6 +238,65 @@ function ImagePlane({
       })
     }
   }, [character, chatBubbleTexture])
+
+  // Load speaking texture
+  useEffect(() => {
+    if (!speakingImageUrl) {
+      setSpeakingTexture(null)
+      speakingImageUrlRef.current = null
+      return
+    }
+    if (speakingImageUrl === speakingImageUrlRef.current && speakingTexture) return
+    speakingImageUrlRef.current = speakingImageUrl
+    const loader = new THREE.TextureLoader()
+    loader.load(speakingImageUrl, (tex) => {
+      // Analyze and crop like the main texture
+      const image = tex.image as HTMLImageElement
+      const canvas = document.createElement('canvas')
+      canvas.width = image.naturalWidth || image.width
+      canvas.height = image.naturalHeight || image.height
+      const ctx = canvas.getContext('2d')!
+      ctx.drawImage(image, 0, 0)
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+      const { data, width, height } = imageData
+
+      let minX = width, minY = height, maxX = 0, maxY = 0
+      for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+          const alpha = data[(y * width + x) * 4 + 3]
+          if (alpha > 10) {
+            if (x < minX) minX = x
+            if (x > maxX) maxX = x
+            if (y < minY) minY = y
+            if (y > maxY) maxY = y
+          }
+        }
+      }
+
+      if (maxX >= minX && maxY >= minY) {
+        const uMin = minX / width
+        const uMax = (maxX + 1) / width
+        const vMin = 1 - (maxY + 1) / height
+        const vMax = 1 - minY / height
+        tex.offset.set(uMin, vMin)
+        tex.repeat.set(uMax - uMin, vMax - vMin)
+      }
+
+      setSpeakingTexture(tex)
+    })
+  }, [speakingImageUrl])
+
+  // Flash between normal and speaking texture every 50ms when speaking
+  useEffect(() => {
+    if (!isSpeaking || !speakingTexture) {
+      setShowSpeakingFrame(false)
+      return
+    }
+    const interval = setInterval(() => {
+      setShowSpeakingFrame(prev => !prev)
+    }, 50)
+    return () => clearInterval(interval)
+  }, [isSpeaking, speakingTexture])
 
   useEffect(() => {
     const loader = new THREE.TextureLoader()
@@ -347,7 +412,7 @@ function ImagePlane({
         <>
           <mesh>
             <planeGeometry args={planeSize} />
-            <meshStandardMaterial map={texture} transparent alphaTest={0.5} side={THREE.DoubleSide} />
+            <meshStandardMaterial map={showSpeakingFrame && speakingTexture ? speakingTexture : texture} transparent alphaTest={0.5} side={THREE.DoubleSide} />
           </mesh>
           {selected && (
             <mesh position={[0, 0, -0.01]}>
@@ -799,6 +864,8 @@ interface ThreeSceneProps {
   billboardIds: Set<number>
   characterIds: Set<number>
   characterRadii: Map<number, number>
+  speakingImageIds: Map<number, string>
+  speakingCharacterId: number | null
   onCharacterProximity: (characterId: number | null) => void
   dialogActive: boolean
   getCameraStateRef: React.MutableRefObject<(() => { position: [number, number, number]; quaternion: [number, number, number, number] }) | null>
@@ -819,6 +886,8 @@ export default function ThreeScene({
   billboardIds,
   characterIds,
   characterRadii,
+  speakingImageIds,
+  speakingCharacterId,
   onCharacterProximity,
   dialogActive,
   getCameraStateRef,
@@ -854,20 +923,25 @@ export default function ThreeScene({
           snapRotationTrigger={snapRotationTrigger}
         />
       )}
-      {acceptedImages.map((img) => (
-        <ImagePlane
-          key={img.id}
-          id={img.id}
-          url={img.url}
-          selected={selectedImageId === img.id}
-          savedPosition={img.position}
-          savedRotation={img.rotation}
-          savedScale={img.scale}
-          onTransformUpdate={onTransformUpdate}
-          billboard={billboardIds.has(img.id)}
-          character={characterIds.has(img.id)}
-        />
-      ))}
+      {acceptedImages.map((img) => {
+        const speakingImgId = speakingImageIds.get(img.id)
+        return (
+          <ImagePlane
+            key={img.id}
+            id={img.id}
+            url={img.url}
+            selected={selectedImageId === img.id}
+            savedPosition={img.position}
+            savedRotation={img.rotation}
+            savedScale={img.scale}
+            onTransformUpdate={onTransformUpdate}
+            billboard={billboardIds.has(img.id)}
+            character={characterIds.has(img.id)}
+            speakingImageUrl={speakingImgId ? `/images/${speakingImgId}.webp` : null}
+            isSpeaking={speakingCharacterId === img.id}
+          />
+        )
+      })}
       <Grid
         position={[0, -1, 0]}
         args={[100, 100]}

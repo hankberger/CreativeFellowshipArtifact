@@ -70,6 +70,11 @@ let db: any;
     await db.exec("ALTER TABLE scene_objects ADD COLUMN radius REAL DEFAULT 5");
   }
 
+  // Migration: add speaking_image_id column if missing
+  if (!cols.some((c: any) => c.name === 'speaking_image_id')) {
+    await db.exec("ALTER TABLE scene_objects ADD COLUMN speaking_image_id TEXT DEFAULT NULL");
+  }
+
   // Create character_dialog table
   await db.exec(`CREATE TABLE IF NOT EXISTS character_dialog (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -232,7 +237,7 @@ app.post(
 app.get("/api/scene-objects", async (req: Request, res: Response) => {
   try {
     const rows = await db.all(
-      "SELECT id, image_id, position_x, position_y, position_z, rotation_x, rotation_y, rotation_z, scale_x, scale_y, scale_z, billboard, character, radius FROM scene_objects ORDER BY created_at ASC",
+      "SELECT id, image_id, position_x, position_y, position_z, rotation_x, rotation_y, rotation_z, scale_x, scale_y, scale_z, billboard, character, radius, speaking_image_id FROM scene_objects ORDER BY created_at ASC",
     );
     const objects = rows.map((r: any) => ({
       id: r.id,
@@ -244,6 +249,7 @@ app.get("/api/scene-objects", async (req: Request, res: Response) => {
       billboard: !!r.billboard,
       character: !!r.character,
       radius: r.radius ?? 5,
+      speakingImageId: r.speaking_image_id || null,
     }));
     res.json(objects);
   } catch (error) {
@@ -284,6 +290,7 @@ app.put(
         billboard,
         character,
         radius,
+        speakingImageId,
       } = req.body;
       await db.run(
         `UPDATE scene_objects SET
@@ -292,9 +299,10 @@ app.put(
           scale_x = ?, scale_y = ?, scale_z = ?,
           billboard = ?,
           character = ?,
-          radius = ?
+          radius = ?,
+          speaking_image_id = ?
         WHERE id = ?`,
-        [positionX, positionY, positionZ, rotationX, rotationY, rotationZ, scaleX, scaleY, scaleZ, billboard ? 1 : 0, character ? 1 : 0, radius ?? 5, id],
+        [positionX, positionY, positionZ, rotationX, rotationY, rotationZ, scaleX, scaleY, scaleZ, billboard ? 1 : 0, character ? 1 : 0, radius ?? 5, speakingImageId ?? null, id],
       );
       res.json({ ok: true });
     } catch (error) {

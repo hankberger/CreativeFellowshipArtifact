@@ -67,6 +67,7 @@ interface AcceptedImage {
   billboard?: boolean;
   character?: boolean;
   radius?: number;
+  speakingImageId?: string | null;
 }
 
 const HOLD_DURATION = 2000
@@ -92,11 +93,14 @@ function App() {
   const [dialogEntries, setDialogEntries] = useState<DialogEntry[]>([])
   const [dialogOpen, setDialogOpen] = useState(false)
   const [characterRadii, setCharacterRadii] = useState<Map<number, number>>(new Map())
+  const [speakingImageIds, setSpeakingImageIds] = useState<Map<number, string>>(new Map())
+  const [speakingGalleryOpen, setSpeakingGalleryOpen] = useState(false)
+  const [speakingGallerySearch, setSpeakingGallerySearch] = useState('')
 
   // Dialog playback state (triggered by proximity)
   const [activeDialog, setActiveDialog] = useState<DialogEntry[]>([])
   const [activeDialogIndex, setActiveDialogIndex] = useState(0)
-  const [, setActiveDialogCharId] = useState<number | null>(null)
+  const [activeDialogCharId, setActiveDialogCharId] = useState<number | null>(null)
 
   // Ref to get camera state from ThreeScene
   const getCameraStateRef = useRef<(() => { position: [number, number, number]; quaternion: [number, number, number, number] }) | null>(null)
@@ -126,6 +130,9 @@ function App() {
           const radii = new Map<number, number>()
           data.forEach((d: AcceptedImage) => { if (d.character && d.radius != null) radii.set(d.id, d.radius) })
           setCharacterRadii(radii)
+          const speaking = new Map<number, string>()
+          data.forEach((d: AcceptedImage) => { if (d.speakingImageId) speaking.set(d.id, d.speakingImageId) })
+          setSpeakingImageIds(speaking)
         }
       } catch (err) {
         console.error('Failed to load scene objects', err)
@@ -247,6 +254,7 @@ function App() {
               billboard: billboardIds.has(selectedImageId),
               character: characterIds.has(selectedImageId),
               radius: characterRadii.get(selectedImageId) ?? 5,
+              speakingImageId: speakingImageIds.get(selectedImageId) ?? null,
             }),
           })
           const isBillboard = billboardIds.has(selectedImageId)
@@ -256,7 +264,7 @@ function App() {
           }
           setAcceptedImages(prev => prev.map(img =>
             img.id === selectedImageId
-              ? { ...img, position: t.position, rotation: t.rotation, scale: t.scale, billboard: isBillboard, character: isCharacter, radius: characterRadii.get(selectedImageId) ?? 5 }
+              ? { ...img, position: t.position, rotation: t.rotation, scale: t.scale, billboard: isBillboard, character: isCharacter, radius: characterRadii.get(selectedImageId) ?? 5, speakingImageId: speakingImageIds.get(selectedImageId) ?? null }
               : img
           ))
         } catch (err) {
@@ -268,7 +276,8 @@ function App() {
     setSelectedImageId(null)
     setDialogOpen(false)
     setDialogEntries([])
-  }, [selectedImageId, billboardIds, characterIds, characterRadii, dialogEntries, saveDialog])
+    setSpeakingGalleryOpen(false)
+  }, [selectedImageId, billboardIds, characterIds, characterRadii, speakingImageIds, dialogEntries, saveDialog])
 
   const handleRemoveObject = useCallback(async () => {
     if (selectedImageId == null) return
@@ -503,6 +512,8 @@ function App() {
         characterIds={characterIds}
         characterRadii={characterRadii}
         onCharacterProximity={handleCharacterProximity}
+        speakingImageIds={speakingImageIds}
+        speakingCharacterId={activeDialog.length > 0 ? activeDialogCharId : null}
         dialogActive={activeDialog.length > 0}
         getCameraStateRef={getCameraStateRef}
         dialogCameraTarget={activeDialog.length > 0 && activeDialog[activeDialogIndex] ? {
@@ -800,6 +811,17 @@ function App() {
                 Dialog
               </button>
             )}
+            {selectedImageId != null && characterIds.has(selectedImageId) && (
+              <button
+                className={`billboard-btn ${speakingImageIds.has(selectedImageId) ? 'active' : ''}`}
+                onClick={() => {
+                  setSpeakingGalleryOpen(prev => !prev)
+                  setSpeakingGallerySearch('')
+                }}
+              >
+                Speaking
+              </button>
+            )}
           </div>
           {selectedImageId != null && characterIds.has(selectedImageId) && (
             <div className="character-radius-row">
@@ -947,6 +969,60 @@ function App() {
                 >
                   Save Dialog
                 </button>
+              </div>
+            </div>
+          )}
+          {speakingGalleryOpen && selectedImageId != null && characterIds.has(selectedImageId) && (
+            <div className="speaking-gallery">
+              <div className="dialog-editor-header">
+                <span className="dialog-editor-title">Speaking Image</span>
+                {speakingImageIds.has(selectedImageId) && (
+                  <button
+                    className="dialog-clear-camera-btn"
+                    onClick={() => {
+                      setSpeakingImageIds(prev => {
+                        const next = new Map(prev)
+                        next.delete(selectedImageId!)
+                        return next
+                      })
+                    }}
+                    title="Remove speaking image"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+              {speakingImageIds.has(selectedImageId) && (
+                <div className="speaking-preview">
+                  <img src={`/images/${speakingImageIds.get(selectedImageId)}.webp`} alt="Speaking" />
+                </div>
+              )}
+              <input
+                type="text"
+                className="gallery-search"
+                placeholder="Search images..."
+                value={speakingGallerySearch}
+                onChange={(e) => setSpeakingGallerySearch(e.target.value)}
+              />
+              <div className="speaking-gallery-grid">
+                {gallery.filter((img) => {
+                  if (!speakingGallerySearch.trim()) return true
+                  return (img.prompt || '').toLowerCase().includes(speakingGallerySearch.trim().toLowerCase())
+                }).map((img) => (
+                  <div
+                    key={img.id}
+                    className={`speaking-gallery-item ${speakingImageIds.get(selectedImageId!) === img.id ? 'selected' : ''}`}
+                    onClick={() => {
+                      setSpeakingImageIds(prev => {
+                        const next = new Map(prev)
+                        next.set(selectedImageId!, img.id)
+                        return next
+                      })
+                    }}
+                  >
+                    <img src={`/images/${img.id}.webp`} alt={img.prompt || 'Image'} />
+                  </div>
+                ))}
               </div>
             </div>
           )}
