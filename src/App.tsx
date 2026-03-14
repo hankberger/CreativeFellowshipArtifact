@@ -239,11 +239,13 @@ function App() {
   }, [])
 
   const activeDialogCharIdRef = useRef<number | null>(null)
-  useEffect(() => { activeDialogCharIdRef.current = activeDialogCharId }, [activeDialogCharId])
+  const activeDialogRef = useRef<DialogEntry[]>([])
 
   const handleCharacterProximity = useCallback(async (characterId: number | null) => {
     if (characterId === null) {
       // Left radius — dismiss dialog
+      activeDialogCharIdRef.current = null
+      activeDialogRef.current = []
       setActiveDialog([])
       setActiveDialogIndex(0)
       setActiveDialogCharId(null)
@@ -251,6 +253,8 @@ function App() {
     }
     // Already showing dialog for this character
     if (characterId === activeDialogCharIdRef.current) return
+    // Mark immediately so the next frame doesn't re-trigger
+    activeDialogCharIdRef.current = characterId
     // Fetch dialog for this character
     try {
       const res = await fetch(`/api/scene-objects/${characterId}/dialog`)
@@ -258,6 +262,7 @@ function App() {
         const data: DialogEntry[] = await res.json()
         const entries = data.filter(d => d.text.trim().length > 0)
         if (entries.length > 0) {
+          activeDialogRef.current = entries
           setActiveDialog(entries)
           setActiveDialogIndex(0)
           setActiveDialogCharId(characterId)
@@ -268,9 +273,6 @@ function App() {
     }
   }, [])
 
-  const activeDialogRef = useRef<DialogEntry[]>([])
-  useEffect(() => { activeDialogRef.current = activeDialog }, [activeDialog])
-
   const advanceDialog = useCallback(() => {
     if (activeDialogRef.current.length === 0) return
     setActiveDialogIndex(prev => {
@@ -278,6 +280,8 @@ function App() {
         return prev + 1
       } else {
         // End of dialog
+        activeDialogRef.current = []
+        activeDialogCharIdRef.current = null
         setActiveDialog([])
         setActiveDialogCharId(null)
         return 0
