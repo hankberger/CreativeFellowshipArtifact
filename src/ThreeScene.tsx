@@ -807,7 +807,7 @@ export default function ThreeScene({
         characterIds={characterIds}
         characterRadii={characterRadii}
         onCharacterProximity={onCharacterProximity}
-        disabled={selectionMode || panelOpen}
+        disabled={selectionMode || panelOpen || dialogActive}
       />
       {selectionMode && (
         <SelectionModeControls
