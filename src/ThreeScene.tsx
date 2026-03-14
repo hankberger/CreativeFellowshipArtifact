@@ -617,6 +617,8 @@ function SelectionModeControls({
   )
 }
 
+const EXIT_RADIUS_MULTIPLIER = 1.5
+
 function ProximityDetector({
   acceptedImages,
   characterIds,
@@ -632,20 +634,51 @@ function ProximityDetector({
 }) {
   const { camera, scene } = useThree()
   const currentCharRef = useRef<number | null>(null)
+  // Track which character the player must fully exit before re-triggering
+  const cooldownCharRef = useRef<number | null>(null)
+  const prevDisabledRef = useRef(disabled)
   const onCharacterProximityRef = useRef(onCharacterProximity)
   onCharacterProximityRef.current = onCharacterProximity
 
   useFrame(() => {
+    // When transitioning from disabled (dialog active) back to enabled,
+    // set cooldown so dialog doesn't immediately re-trigger
+    if (prevDisabledRef.current && !disabled && currentCharRef.current !== null) {
+      cooldownCharRef.current = currentCharRef.current
+      currentCharRef.current = null
+    }
+    prevDisabledRef.current = disabled
+
     if (disabled) return
 
     const playerPos = camera.position
+
+    // If we have a cooldown character, check if player has left the exit radius
+    if (cooldownCharRef.current !== null) {
+      let stillInExit = false
+      const cooldownId = cooldownCharRef.current
+      scene.traverse((obj) => {
+        if (obj.userData.imageId === cooldownId) {
+          const objPos = new THREE.Vector3()
+          obj.getWorldPosition(objPos)
+          const dx = playerPos.x - objPos.x
+          const dz = playerPos.z - objPos.z
+          const dist = Math.sqrt(dx * dx + dz * dz)
+          const exitRadius = (characterRadii.get(cooldownId) ?? 5) * EXIT_RADIUS_MULTIPLIER
+          if (dist <= exitRadius) stillInExit = true
+        }
+      })
+      if (stillInExit) return
+      // Player has left the exit radius — clear cooldown
+      cooldownCharRef.current = null
+    }
+
     let closestId: number | null = null
     let closestDist = Infinity
 
-    // Check distance to each character
+    // Check distance to each character (entry radius)
     for (const img of acceptedImages) {
       if (!characterIds.has(img.id)) continue
-      // Find the object in scene to get its current world position
       let objPos: THREE.Vector3 | null = null
       scene.traverse((obj) => {
         if (obj.userData.imageId === img.id) {
@@ -655,7 +688,6 @@ function ProximityDetector({
       })
       if (!objPos) continue
 
-      // XZ distance only (ignore vertical)
       const dx = playerPos.x - (objPos as THREE.Vector3).x
       const dz = playerPos.z - (objPos as THREE.Vector3).z
       const dist = Math.sqrt(dx * dx + dz * dz)
@@ -668,6 +700,10 @@ function ProximityDetector({
     }
 
     if (closestId !== currentCharRef.current) {
+      // If we're leaving a character, set it as the cooldown target
+      if (currentCharRef.current !== null && closestId === null) {
+        cooldownCharRef.current = currentCharRef.current
+      }
       currentCharRef.current = closestId
       onCharacterProximityRef.current(closestId)
     }

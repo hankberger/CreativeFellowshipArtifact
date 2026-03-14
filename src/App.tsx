@@ -96,13 +96,27 @@ function App() {
       if (!match) return
       const imageId = match[1]
       try {
+        // Compute spawn position in front of the player
+        let spawnPosition: [number, number, number] | undefined
+        const camState = getCameraStateRef.current?.()
+        if (camState) {
+          const [cx, , cz] = camState.position
+          const [qx, qy, qz, qw] = camState.quaternion
+          // Camera forward = -Z column of rotation matrix from quaternion
+          const fx = -2 * (qx * qz + qw * qy)
+          const fz = -(1 - 2 * (qx * qx + qy * qy))
+          // Flatten to XZ plane and normalize
+          const len = Math.sqrt(fx * fx + fz * fz) || 1
+          spawnPosition = [cx + (fx / len) * 4, 0, cz + (fz / len) * 4]
+        }
+
         const res = await fetch('/api/scene-objects', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ imageId }),
         })
         const { id } = await res.json()
-        setAcceptedImages(prev => [...prev, { id, imageId, url: imageUrl }])
+        setAcceptedImages(prev => [...prev, { id, imageId, url: imageUrl, position: spawnPosition }])
         setPanelOpen(false)
         setSelectedImageId(id)
         setSelectionMode(true)
@@ -531,6 +545,17 @@ function App() {
                     className="gallery-item gallery-item-clickable"
                     onClick={async () => {
                       try {
+                        // Compute spawn position in front of the player
+                        let spawnPosition: [number, number, number] | undefined
+                        const camState = getCameraStateRef.current?.()
+                        if (camState) {
+                          const [cx, , cz] = camState.position
+                          const [qx, qy2, qz, qw] = camState.quaternion
+                          const fx = -2 * (qx * qz + qw * qy2)
+                          const fz = -(1 - 2 * (qx * qx + qy2 * qy2))
+                          const len = Math.sqrt(fx * fx + fz * fz) || 1
+                          spawnPosition = [cx + (fx / len) * 4, 0, cz + (fz / len) * 4]
+                        }
                         const res = await fetch('/api/scene-objects', {
                           method: 'POST',
                           headers: { 'Content-Type': 'application/json' },
@@ -538,7 +563,7 @@ function App() {
                         })
                         const { id } = await res.json()
                         const url = `/images/${img.id}.webp`
-                        setAcceptedImages(prev => [...prev, { id, imageId: img.id, url }])
+                        setAcceptedImages(prev => [...prev, { id, imageId: img.id, url, position: spawnPosition }])
                         setPanelOpen(false)
                         setSelectedImageId(id)
                         setSelectionMode(true)
