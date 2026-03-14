@@ -52,7 +52,7 @@ function App() {
   // Dialog playback state (triggered by proximity)
   const [activeDialog, setActiveDialog] = useState<DialogEntry[]>([])
   const [activeDialogIndex, setActiveDialogIndex] = useState(0)
-  const [activeDialogCharId, setActiveDialogCharId] = useState<number | null>(null)
+  const [, setActiveDialogCharId] = useState<number | null>(null)
 
   // Ref to get camera state from ThreeScene
   const getCameraStateRef = useRef<(() => { position: [number, number, number]; quaternion: [number, number, number, number] }) | null>(null)
