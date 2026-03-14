@@ -2,6 +2,48 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import ThreeScene from './ThreeScene'
 import './App.css'
 
+interface DialogTextHandle {
+  isFinished: () => boolean
+  skipToEnd: () => void
+}
+
+function DialogText({ text, handleRef }: { text: string; handleRef: React.MutableRefObject<DialogTextHandle | null> }) {
+  const spaceIdx = text.indexOf(' ')
+  const firstWord = spaceIdx === -1 ? text : text.slice(0, spaceIdx)
+  const rest = spaceIdx === -1 ? '' : text.slice(spaceIdx)
+  const [charCount, setCharCount] = useState(0)
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  useEffect(() => {
+    setCharCount(0)
+    if (!rest) return
+    let i = 0
+    intervalRef.current = setInterval(() => {
+      i++
+      setCharCount(i)
+      if (i >= rest.length) {
+        if (intervalRef.current) clearInterval(intervalRef.current)
+        intervalRef.current = null
+      }
+    }, 30)
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current)
+      intervalRef.current = null
+    }
+  }, [text])
+
+  handleRef.current = {
+    isFinished: () => !rest || charCount >= rest.length,
+    skipToEnd: () => {
+      if (intervalRef.current) clearInterval(intervalRef.current)
+      intervalRef.current = null
+      setCharCount(rest.length)
+    },
+  }
+
+  return <><strong>{firstWord}</strong>{rest.slice(0, charCount)}</>
+}
+
 interface ImageRecord {
   id: string;
   prompt: string;
@@ -253,6 +295,7 @@ function App() {
   }, [])
 
   const activeDialogCharIdRef = useRef<number | null>(null)
+  const dialogTextRef = useRef<DialogTextHandle | null>(null)
   const activeDialogRef = useRef<DialogEntry[]>([])
 
   const handleCharacterProximity = useCallback(async (characterId: number | null) => {
@@ -307,11 +350,15 @@ function App() {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLInputElement) return
 
-      // Dialog playback: space advances dialog
+      // Dialog playback: space advances or skips typewriter
       if (activeDialog.length > 0) {
         if (e.code === 'Space') {
           e.preventDefault()
-          advanceDialog()
+          if (dialogTextRef.current && !dialogTextRef.current.isFinished()) {
+            dialogTextRef.current.skipToEnd()
+          } else {
+            advanceDialog()
+          }
         }
         return
       }
@@ -332,7 +379,11 @@ function App() {
 
     const onClick = () => {
       if (activeDialog.length > 0) {
-        advanceDialog()
+        if (dialogTextRef.current && !dialogTextRef.current.isFinished()) {
+          dialogTextRef.current.skipToEnd()
+        } else {
+          advanceDialog()
+        }
       }
     }
 
@@ -829,7 +880,9 @@ function App() {
       {activeDialog.length > 0 && (
         <div className="dialog-playback-overlay">
           <div className="dialog-card">
-            <div className="dialog-card-text">{activeDialog[activeDialogIndex]?.text}</div>
+            <div className="dialog-card-text">
+              <DialogText text={activeDialog[activeDialogIndex]?.text || ''} handleRef={dialogTextRef} />
+            </div>
             <div className="dialog-card-footer">
               <span className="dialog-card-progress">{activeDialogIndex + 1} / {activeDialog.length}</span>
               <span className="dialog-card-hint">
@@ -854,7 +907,11 @@ function App() {
             </div>
             <div className="controls-guide-row">
               <kbd>Hold Click</kbd>
-              <span className="controls-guide-row-label">Select object</span>
+              <span className="controls-guide-row-label">Edit Object</span>
+            </div>
+            <div className="controls-guide-row">
+              <kbd>Esc</kbd>
+              <span className="controls-guide-row-label">Show Mouse</span>
             </div>
             <div className="controls-guide-divider" />
             <div className="controls-guide-row controls-guide-action">
