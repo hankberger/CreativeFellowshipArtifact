@@ -134,6 +134,31 @@ function App() {
     return () => cancelAnimationFrame(animFrame)
   }, [holdTarget])
 
+  const loadDialog = useCallback(async (objectId: number) => {
+    try {
+      const res = await fetch(`/api/scene-objects/${objectId}/dialog`)
+      if (res.ok) {
+        const data = await res.json()
+        setDialogEntries(data.length > 0 ? data : [{ text: '' }])
+      }
+    } catch (err) {
+      console.error('Failed to load dialog', err)
+      setDialogEntries([{ text: '' }])
+    }
+  }, [])
+
+  const saveDialog = useCallback(async (objectId: number, entries: DialogEntry[]) => {
+    try {
+      await fetch(`/api/scene-objects/${objectId}/dialog`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ entries }),
+      })
+    } catch (err) {
+      console.error('Failed to save dialog', err)
+    }
+  }, [])
+
   const handleAcceptPlacement = useCallback(async () => {
     if (selectedImageId != null) {
       const t = latestTransforms.current.get(selectedImageId)
@@ -192,31 +217,6 @@ function App() {
     setSelectionMode(false)
     setSelectedImageId(null)
   }, [selectedImageId])
-
-  const loadDialog = useCallback(async (objectId: number) => {
-    try {
-      const res = await fetch(`/api/scene-objects/${objectId}/dialog`)
-      if (res.ok) {
-        const data = await res.json()
-        setDialogEntries(data.length > 0 ? data : [{ text: '' }])
-      }
-    } catch (err) {
-      console.error('Failed to load dialog', err)
-      setDialogEntries([{ text: '' }])
-    }
-  }, [])
-
-  const saveDialog = useCallback(async (objectId: number, entries: DialogEntry[]) => {
-    try {
-      await fetch(`/api/scene-objects/${objectId}/dialog`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ entries }),
-      })
-    } catch (err) {
-      console.error('Failed to save dialog', err)
-    }
-  }, [])
 
   const togglePanel = useCallback(() => {
     setPanelOpen(prev => !prev)
