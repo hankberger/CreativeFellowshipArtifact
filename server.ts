@@ -284,6 +284,7 @@ app.put(
     try {
       const { id } = req.params;
       const {
+        imageId,
         positionX, positionY, positionZ,
         rotationX, rotationY, rotationZ,
         scaleX, scaleY, scaleZ,
@@ -294,6 +295,7 @@ app.put(
       } = req.body;
       await db.run(
         `UPDATE scene_objects SET
+          image_id = COALESCE(?, image_id),
           position_x = ?, position_y = ?, position_z = ?,
           rotation_x = ?, rotation_y = ?, rotation_z = ?,
           scale_x = ?, scale_y = ?, scale_z = ?,
@@ -302,7 +304,7 @@ app.put(
           radius = ?,
           speaking_image_id = ?
         WHERE id = ?`,
-        [positionX, positionY, positionZ, rotationX, rotationY, rotationZ, scaleX, scaleY, scaleZ, billboard ? 1 : 0, character ? 1 : 0, radius ?? 5, speakingImageId ?? null, id],
+        [imageId ?? null, positionX, positionY, positionZ, rotationX, rotationY, rotationZ, scaleX, scaleY, scaleZ, billboard ? 1 : 0, character ? 1 : 0, radius ?? 5, speakingImageId ?? null, id],
       );
       res.json({ ok: true });
     } catch (error) {

@@ -99,6 +99,8 @@ function App() {
   const [speakingImageIds, setSpeakingImageIds] = useState<Map<number, string>>(new Map())
   const [speakingGalleryOpen, setSpeakingGalleryOpen] = useState(false)
   const [speakingGallerySearch, setSpeakingGallerySearch] = useState('')
+  const [swapGalleryOpen, setSwapGalleryOpen] = useState(false)
+  const [swapGallerySearch, setSwapGallerySearch] = useState('')
 
   // Dialog playback state (triggered by proximity)
   const [activeDialog, setActiveDialog] = useState<DialogEntry[]>([])
@@ -247,10 +249,12 @@ function App() {
       const t = latestTransforms.current.get(selectedImageId)
       if (t) {
         try {
+          const currentObj = acceptedImages.find(img => img.id === selectedImageId)
           await fetch(`/api/scene-objects/${selectedImageId}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
+              imageId: currentObj?.imageId,
               positionX: t.position[0], positionY: t.position[1], positionZ: t.position[2],
               rotationX: t.rotation[0], rotationY: t.rotation[1], rotationZ: t.rotation[2],
               scaleX: t.scale[0], scaleY: t.scale[1], scaleZ: t.scale[2],
@@ -280,7 +284,8 @@ function App() {
     setDialogOpen(false)
     setDialogEntries([])
     setSpeakingGalleryOpen(false)
-  }, [selectedImageId, billboardIds, characterIds, characterRadii, speakingImageIds, dialogEntries, saveDialog])
+    setSwapGalleryOpen(false)
+  }, [selectedImageId, acceptedImages, billboardIds, characterIds, characterRadii, speakingImageIds, dialogEntries, saveDialog])
 
   const handleDuplicateObject = useCallback(async () => {
     if (selectedImageId == null) return
@@ -891,6 +896,15 @@ function App() {
                 Speaking
               </button>
             )}
+            <button
+              className="billboard-btn"
+              onClick={() => {
+                setSwapGalleryOpen(prev => !prev)
+                setSwapGallerySearch('')
+              }}
+            >
+              Swap
+            </button>
           </div>
           {selectedImageId != null && characterIds.has(selectedImageId) && (
             <div className="character-radius-row">
@@ -1161,6 +1175,44 @@ function App() {
                     <img src={`/images/${img.id}.webp`} alt={img.prompt || 'Image'} />
                   </div>
                 ))}
+              </div>
+            </div>
+          )}
+          {swapGalleryOpen && selectedImageId != null && (
+            <div className="speaking-gallery">
+              <div className="dialog-editor-header">
+                <span className="dialog-editor-title">Swap Image</span>
+              </div>
+              <input
+                type="text"
+                className="gallery-search"
+                placeholder="Search images..."
+                value={swapGallerySearch}
+                onChange={(e) => setSwapGallerySearch(e.target.value)}
+              />
+              <div className="speaking-gallery-grid">
+                {gallery.filter((img) => {
+                  if (!swapGallerySearch.trim()) return true
+                  return (img.prompt || '').toLowerCase().includes(swapGallerySearch.trim().toLowerCase())
+                }).map((img) => {
+                  const selected = acceptedImages.find(a => a.id === selectedImageId)
+                  return (
+                    <div
+                      key={img.id}
+                      className={`speaking-gallery-item ${selected?.imageId === img.id ? 'selected' : ''}`}
+                      onClick={() => {
+                        setAcceptedImages(prev => prev.map(a =>
+                          a.id === selectedImageId
+                            ? { ...a, imageId: img.id, url: `/images/${img.id}.webp` }
+                            : a
+                        ))
+                        setSwapGalleryOpen(false)
+                      }}
+                    >
+                      <img src={`/images/${img.id}.webp`} alt={img.prompt || 'Image'} />
+                    </div>
+                  )
+                })}
               </div>
             </div>
           )}
