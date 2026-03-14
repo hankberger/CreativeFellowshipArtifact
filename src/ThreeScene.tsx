@@ -294,7 +294,7 @@ function ImagePlane({
     }
     const interval = setInterval(() => {
       setShowSpeakingFrame(prev => !prev)
-    }, 50)
+    }, 100)
     return () => clearInterval(interval)
   }, [isSpeaking, speakingTexture])
 
