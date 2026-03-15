@@ -77,6 +77,7 @@ const HOLD_DURATION = 2000
 
 function App() {
   const [prompt, setPrompt] = useState('A cathedral made entirely of ice, with colored light refracting through its translucent walls')
+  const [useMagentaScreen, setUseMagentaScreen] = useState(false)
   const [imageUrl, setImageUrl] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -668,12 +669,7 @@ function App() {
         if (e.code === 'KeyT') setTransformMode('scale')
         if (e.code === 'Enter' || e.code === 'Escape') handleAcceptPlacement()
         if (e.code === 'Delete') handleRemoveObject()
-        return
-      }
-
-      if (e.code === 'KeyZ' && (e.ctrlKey || e.metaKey)) {
-        e.preventDefault()
-        handleUndo()
+        if (e.code === 'KeyZ' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); handleUndo() }
         return
       }
 
@@ -738,7 +734,7 @@ function App() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ prompt, referenceImages: refImagesBase64 }),
+        body: JSON.stringify({ prompt, referenceImages: refImagesBase64, useMagentaScreen }),
       })
 
       if (!response.ok) {
@@ -885,6 +881,16 @@ function App() {
                 multiple
               />
             </div>
+
+            <label className="magenta-toggle">
+              <input
+                type="checkbox"
+                checked={useMagentaScreen}
+                onChange={(e) => setUseMagentaScreen(e.target.checked)}
+              />
+              <span>Magenta screen</span>
+              <span className="magenta-toggle-hint">(use for green objects)</span>
+            </label>
 
             <button
               type="submit"
@@ -1437,6 +1443,11 @@ function App() {
           <button className="duplicate-object-btn" onClick={handleDuplicateObject}>
             Duplicate
           </button>
+          {canUndo && (
+            <button className="undo-btn" onClick={handleUndo} title="Undo last action (Ctrl+Z)">
+              Undo
+            </button>
+          )}
           <button className="remove-object-btn" onClick={handleRemoveObject}>
             Remove
           </button>
@@ -1461,12 +1472,6 @@ function App() {
             </div>
           </div>
         </div>
-      )}
-
-      {canUndo && (
-        <button className="undo-btn" onClick={handleUndo} title="Undo last action (Ctrl+Z)">
-          Undo
-        </button>
       )}
 
       {!selectionMode && (

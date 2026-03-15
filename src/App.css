@@ -237,6 +237,28 @@
   font-variant-numeric: tabular-nums;
 }
 
+.magenta-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.8);
+  cursor: pointer;
+  margin-bottom: 0.5rem;
+}
+
+.magenta-toggle input[type="checkbox"] {
+  accent-color: #ff00ff;
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.magenta-toggle-hint {
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 0.75rem;
+}
+
 .generate-btn {
   position: relative;
   background: transparent;
@@ -1617,32 +1639,26 @@
 
 /* ─── Undo Button ─── */
 .undo-btn {
-  position: fixed;
-  bottom: 1.5rem;
-  left: 1.5rem;
-  z-index: 10;
-  background: var(--forge-surface);
-  backdrop-filter: blur(20px) saturate(1.1);
-  border: 1px solid var(--forge-border);
-  color: var(--forge-text-dim);
-  padding: 0.5rem 1.1rem;
+  background: transparent;
+  border: 1px solid var(--forge-gold);
+  color: var(--forge-gold);
+  padding: 0.5rem 2rem;
   border-radius: 2px;
   font-family: 'Syne', sans-serif;
-  font-size: 0.75rem;
-  font-weight: 600;
-  letter-spacing: 0.06em;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
   cursor: pointer;
-  transition: all 0.25s;
-  box-shadow: 0 0 30px rgba(0, 0, 0, 0.3);
-  animation: hud-appear 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.undo-btn:hover {
-  border-color: var(--forge-border-hover);
-  color: var(--forge-gold);
+  transition: all 0.3s;
   box-shadow: 0 0 20px var(--forge-glow);
 }
 
+.undo-btn:hover {
+  background: rgba(232, 168, 73, 0.15);
+  box-shadow: 0 0 30px var(--forge-glow-strong);
+}
+
 .undo-btn:active {
-  transform: scale(0.96);
+  transform: scale(0.97);
 }

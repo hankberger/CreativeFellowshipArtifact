@@ -137,12 +137,14 @@ app.post(
   "/api/generate-image",
   async (req: Request, res: Response): Promise<any> => {
     try {
-      const { prompt, referenceImages } = req.body;
+      const { prompt, referenceImages, useMagentaScreen } = req.body;
       if (!prompt) {
         return res.status(400).json({ error: "Prompt is required" });
       }
 
-      const finalPrompt = `${prompt}, isolated on a solid bright green chroma key (#00FF00) background with no shadows, no gradients, no floor, and no reflections. The subject should have clean, sharp edges with no green or light-colored fringing. Studio product photography style with flat even lighting.`;
+      const screenColor = useMagentaScreen ? "magenta (#FF00FF)" : "bright green (#00FF00)";
+      const fringeColor = useMagentaScreen ? "magenta or pink" : "green or light-colored";
+      const finalPrompt = `${prompt}, isolated on a solid ${screenColor} chroma key background with no shadows, no gradients, no floor, and no reflections. The subject should have clean, sharp edges with no ${fringeColor} fringing. Studio product photography style with flat even lighting.`;
 
       // Build contents array with optional reference images
       const contents: any[] = [{ text: finalPrompt }];
@@ -197,17 +199,28 @@ app.post(
           const g = data[i + 1];
           const b = data[i + 2];
 
-          // Chroma key removal: detect green background pixels
-          // "greenness" = how much greener the pixel is than red/blue
-          const greenness = g - Math.max(r, b);
+          if (useMagentaScreen) {
+            // Chroma key removal: detect magenta background pixels
+            // "magentaness" = how much more red+blue vs green
+            const magentaness = Math.min(r, b) - g;
 
-          if (greenness > 30) {
-            // Strong green — fully transparent
-            data[i + 3] = 0;
-          } else if (greenness > 0 && g > 100) {
-            // Edge feathering: semi-transparent for pixels with mild green tint
-            const alpha = Math.round(255 * (1 - greenness / 30));
-            data[i + 3] = alpha;
+            if (magentaness > 30) {
+              data[i + 3] = 0;
+            } else if (magentaness > 0 && Math.min(r, b) > 100) {
+              const alpha = Math.round(255 * (1 - magentaness / 30));
+              data[i + 3] = alpha;
+            }
+          } else {
+            // Chroma key removal: detect green background pixels
+            // "greenness" = how much greener the pixel is than red/blue
+            const greenness = g - Math.max(r, b);
+
+            if (greenness > 30) {
+              data[i + 3] = 0;
+            } else if (greenness > 0 && g > 100) {
+              const alpha = Math.round(255 * (1 - greenness / 30));
+              data[i + 3] = alpha;
+            }
           }
         }
 
