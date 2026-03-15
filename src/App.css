@@ -1614,3 +1614,35 @@
   object-fit: cover;
   display: block;
 }
+
+/* ─── Undo Button ─── */
+.undo-btn {
+  position: fixed;
+  bottom: 1.5rem;
+  left: 1.5rem;
+  z-index: 10;
+  background: var(--forge-surface);
+  backdrop-filter: blur(20px) saturate(1.1);
+  border: 1px solid var(--forge-border);
+  color: var(--forge-text-dim);
+  padding: 0.5rem 1.1rem;
+  border-radius: 2px;
+  font-family: 'Syne', sans-serif;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  transition: all 0.25s;
+  box-shadow: 0 0 30px rgba(0, 0, 0, 0.3);
+  animation: hud-appear 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.undo-btn:hover {
+  border-color: var(--forge-border-hover);
+  color: var(--forge-gold);
+  box-shadow: 0 0 20px var(--forge-glow);
+}
+
+.undo-btn:active {
+  transform: scale(0.96);
+}

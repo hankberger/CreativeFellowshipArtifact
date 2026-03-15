@@ -103,6 +103,17 @@ function App() {
   const [swapGallerySearch, setSwapGallerySearch] = useState('')
   const [multiSelectMode, setMultiSelectMode] = useState(false)
   const [selectedImageIds, setSelectedImageIds] = useState<Set<number>>(new Set())
+  const [canUndo, setCanUndo] = useState(false)
+
+  // Undo stack
+  interface UndoEntry {
+    acceptedImages: AcceptedImage[]
+    billboardIds: Set<number>
+    characterIds: Set<number>
+    characterRadii: Map<number, number>
+    speakingImageIds: Map<number, string>
+  }
+  const undoStack = useRef<UndoEntry[]>([])
 
   // Dialog playback state (triggered by proximity)
   const [activeDialog, setActiveDialog] = useState<DialogEntry[]>([])
@@ -139,6 +150,138 @@ function App() {
       return next
     })
   }, [selectedImageId])
+
+  // Use refs for undo so handleUndo doesn't need to recreate on every state change
+  const acceptedImagesRef = useRef(acceptedImages)
+  acceptedImagesRef.current = acceptedImages
+  const billboardIdsRef = useRef(billboardIds)
+  billboardIdsRef.current = billboardIds
+  const characterIdsRef = useRef(characterIds)
+  characterIdsRef.current = characterIds
+  const characterRadiiRef = useRef(characterRadii)
+  characterRadiiRef.current = characterRadii
+  const speakingImageIdsRef = useRef(speakingImageIds)
+  speakingImageIdsRef.current = speakingImageIds
+
+  const pushUndo = useCallback(() => {
+    undoStack.current.push({
+      acceptedImages: acceptedImagesRef.current.map(img => ({ ...img })),
+      billboardIds: new Set(billboardIdsRef.current),
+      characterIds: new Set(characterIdsRef.current),
+      characterRadii: new Map(characterRadiiRef.current),
+      speakingImageIds: new Map(speakingImageIdsRef.current),
+    })
+    if (undoStack.current.length > 20) undoStack.current.shift()
+    setCanUndo(true)
+  }, [])
+
+  const handleUndo = useCallback(async () => {
+    const entry = undoStack.current.pop()
+    if (!entry) return
+    setCanUndo(undoStack.current.length > 0)
+
+    const currentImages = acceptedImagesRef.current
+    const currentIds = new Set(currentImages.map(img => img.id))
+    const prevIds = new Set(entry.acceptedImages.map(img => img.id))
+
+    // Delete objects that were added since the snapshot
+    for (const img of currentImages) {
+      if (!prevIds.has(img.id)) {
+        try { await fetch(`/api/scene-objects/${img.id}`, { method: 'DELETE' }) } catch {}
+      }
+    }
+
+    // Recreate objects that were removed since the snapshot
+    const idMap = new Map<number, number>()
+    for (const img of entry.acceptedImages) {
+      if (!currentIds.has(img.id)) {
+        try {
+          const res = await fetch('/api/scene-objects', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ imageId: img.imageId }),
+          })
+          const { id: newId } = await res.json()
+          idMap.set(img.id, newId)
+
+          await fetch(`/api/scene-objects/${newId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              imageId: img.imageId,
+              positionX: img.position?.[0] ?? 0, positionY: img.position?.[1] ?? 0, positionZ: img.position?.[2] ?? 0,
+              rotationX: img.rotation?.[0] ?? 0, rotationY: img.rotation?.[1] ?? 0, rotationZ: img.rotation?.[2] ?? 0,
+              scaleX: img.scale?.[0] ?? 1, scaleY: img.scale?.[1] ?? 1, scaleZ: img.scale?.[2] ?? 1,
+              billboard: entry.billboardIds.has(img.id),
+              character: entry.characterIds.has(img.id),
+              radius: entry.characterRadii.get(img.id) ?? 5,
+              speakingImageId: entry.speakingImageIds.get(img.id) ?? null,
+            }),
+          })
+        } catch (err) {
+          console.error('Failed to recreate object on undo', err)
+        }
+      }
+    }
+
+    // Restore transforms for objects that still exist
+    for (const img of entry.acceptedImages) {
+      if (currentIds.has(img.id)) {
+        try {
+          await fetch(`/api/scene-objects/${img.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              imageId: img.imageId,
+              positionX: img.position?.[0] ?? 0, positionY: img.position?.[1] ?? 0, positionZ: img.position?.[2] ?? 0,
+              rotationX: img.rotation?.[0] ?? 0, rotationY: img.rotation?.[1] ?? 0, rotationZ: img.rotation?.[2] ?? 0,
+              scaleX: img.scale?.[0] ?? 1, scaleY: img.scale?.[1] ?? 1, scaleZ: img.scale?.[2] ?? 1,
+              billboard: entry.billboardIds.has(img.id),
+              character: entry.characterIds.has(img.id),
+              radius: entry.characterRadii.get(img.id) ?? 5,
+              speakingImageId: entry.speakingImageIds.get(img.id) ?? null,
+            }),
+          })
+        } catch (err) {
+          console.error('Failed to restore transform on undo', err)
+        }
+      }
+    }
+
+    // Remap IDs for recreated objects
+    const remapId = (id: number) => idMap.get(id) ?? id
+
+    setAcceptedImages(entry.acceptedImages.map(img => ({ ...img, id: remapId(img.id) })))
+
+    setBillboardIds(new Set(Array.from(entry.billboardIds).map(remapId)))
+    setCharacterIds(new Set(Array.from(entry.characterIds).map(remapId)))
+
+    const newRadii = new Map<number, number>()
+    entry.characterRadii.forEach((v, k) => newRadii.set(remapId(k), v))
+    setCharacterRadii(newRadii)
+
+    const newSpeaking = new Map<number, string>()
+    entry.speakingImageIds.forEach((v, k) => newSpeaking.set(remapId(k), v))
+    setSpeakingImageIds(newSpeaking)
+
+    // Update latestTransforms ref
+    for (const img of entry.acceptedImages) {
+      const newId = remapId(img.id)
+      if (img.position) {
+        latestTransforms.current.set(newId, {
+          position: img.position,
+          rotation: img.rotation ?? [0, 0, 0],
+          scale: img.scale ?? [1, 1, 1],
+        })
+      }
+    }
+
+    // Exit selection mode if active
+    setSelectionMode(false)
+    setSelectedImageId(null)
+    setMultiSelectMode(false)
+    setSelectedImageIds(new Set())
+  }, [])
 
   // Load scene objects on mount
   useEffect(() => {
@@ -263,6 +406,7 @@ function App() {
   }, [])
 
   const handleAcceptPlacement = useCallback(async () => {
+    pushUndo()
     const idsToSave = multiSelectMode && selectedImageIds.size > 0
       ? Array.from(selectedImageIds)
       : (selectedImageId != null ? [selectedImageId] : [])
@@ -316,9 +460,10 @@ function App() {
     setSwapGalleryOpen(false)
     setSnapToGroundTrigger(0)
     setSnapRotationTrigger({ rotation: [0, 0, 0], counter: 0 })
-  }, [selectedImageId, selectedImageIds, multiSelectMode, acceptedImages, billboardIds, characterIds, characterRadii, speakingImageIds, dialogEntries, saveDialog])
+  }, [pushUndo, selectedImageId, selectedImageIds, multiSelectMode, acceptedImages, billboardIds, characterIds, characterRadii, speakingImageIds, dialogEntries, saveDialog])
 
   const handleDuplicateObject = useCallback(async () => {
+    pushUndo()
     const idsToDuplicate = multiSelectMode && selectedImageIds.size > 0
       ? Array.from(selectedImageIds)
       : (selectedImageId != null ? [selectedImageId] : [])
@@ -407,9 +552,10 @@ function App() {
     } catch (err) {
       console.error('Failed to duplicate object', err)
     }
-  }, [selectedImageId, selectedImageIds, multiSelectMode, acceptedImages, billboardIds, characterIds, characterRadii, speakingImageIds, dialogEntries, saveDialog])
+  }, [pushUndo, selectedImageId, selectedImageIds, multiSelectMode, acceptedImages, billboardIds, characterIds, characterRadii, speakingImageIds, dialogEntries, saveDialog])
 
   const handleRemoveObject = useCallback(async () => {
+    pushUndo()
     const idsToRemove = multiSelectMode && selectedImageIds.size > 0
       ? Array.from(selectedImageIds)
       : (selectedImageId != null ? [selectedImageId] : [])
@@ -440,7 +586,7 @@ function App() {
     setSelectedImageIds(new Set())
     setSnapToGroundTrigger(0)
     setSnapRotationTrigger({ rotation: [0, 0, 0], counter: 0 })
-  }, [selectedImageId, selectedImageIds, multiSelectMode])
+  }, [pushUndo, selectedImageId, selectedImageIds, multiSelectMode])
 
   const togglePanel = useCallback(() => {
     setPanelOpen(prev => !prev)
@@ -525,6 +671,12 @@ function App() {
         return
       }
 
+      if (e.code === 'KeyZ' && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault()
+        handleUndo()
+        return
+      }
+
       if (e.code === 'KeyE') {
         togglePanel()
       }
@@ -546,7 +698,7 @@ function App() {
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('click', onClick)
     }
-  }, [togglePanel, selectionMode, handleAcceptPlacement, handleRemoveObject, activeDialog, advanceDialog])
+  }, [togglePanel, selectionMode, handleAcceptPlacement, handleRemoveObject, handleUndo, activeDialog, advanceDialog])
 
   const fetchGallery = async () => {
     try {
@@ -1309,6 +1461,12 @@ function App() {
             </div>
           </div>
         </div>
+      )}
+
+      {canUndo && (
+        <button className="undo-btn" onClick={handleUndo} title="Undo last action (Ctrl+Z)">
+          Undo
+        </button>
       )}
 
       {!selectionMode && (
