@@ -314,6 +314,8 @@ function App() {
     setDialogEntries([])
     setSpeakingGalleryOpen(false)
     setSwapGalleryOpen(false)
+    setSnapToGroundTrigger(0)
+    setSnapRotationTrigger({ rotation: [0, 0, 0], counter: 0 })
   }, [selectedImageId, selectedImageIds, multiSelectMode, acceptedImages, billboardIds, characterIds, characterRadii, speakingImageIds, dialogEntries, saveDialog])
 
   const handleDuplicateObject = useCallback(async () => {
@@ -436,6 +438,8 @@ function App() {
     setSelectedImageId(null)
     setMultiSelectMode(false)
     setSelectedImageIds(new Set())
+    setSnapToGroundTrigger(0)
+    setSnapRotationTrigger({ rotation: [0, 0, 0], counter: 0 })
   }, [selectedImageId, selectedImageIds, multiSelectMode])
 
   const togglePanel = useCallback(() => {
