@@ -87,7 +87,7 @@ function App() {
   const [selectionMode, setSelectionMode] = useState(false)
   const [transformMode, setTransformMode] = useState<'translate' | 'rotate' | 'scale'>('translate')
   const [snapToGroundTrigger, setSnapToGroundTrigger] = useState(0)
-  const [snapRotationTrigger, setSnapRotationTrigger] = useState<{ rotation: [number, number, number]; counter: number }>({ rotation: [0, 0, 0], counter: 0 })
+  const [snapRotationTrigger, setSnapRotationTrigger] = useState<{ rotation: [number, number, number]; counter: number; delta?: boolean }>({ rotation: [0, 0, 0], counter: 0 })
   const [billboardIds, setBillboardIds] = useState<Set<number>>(new Set())
   const [characterIds, setCharacterIds] = useState<Set<number>>(new Set())
   const [gallerySearch, setGallerySearch] = useState('')
@@ -101,6 +101,8 @@ function App() {
   const [speakingGallerySearch, setSpeakingGallerySearch] = useState('')
   const [swapGalleryOpen, setSwapGalleryOpen] = useState(false)
   const [swapGallerySearch, setSwapGallerySearch] = useState('')
+  const [multiSelectMode, setMultiSelectMode] = useState(false)
+  const [selectedImageIds, setSelectedImageIds] = useState<Set<number>>(new Set())
 
   // Dialog playback state (triggered by proximity)
   const [activeDialog, setActiveDialog] = useState<DialogEntry[]>([])
@@ -121,6 +123,22 @@ function App() {
   const handleTransformUpdate = useCallback((id: number, position: [number, number, number], rotation: [number, number, number], scale: [number, number, number]) => {
     latestTransforms.current.set(id, { position, rotation, scale })
   }, [])
+
+  const handleMultiSelectToggle = useCallback((id: number) => {
+    setSelectedImageIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) {
+        next.delete(id)
+        // If we removed the primary, pick a new one
+        if (id === selectedImageId && next.size > 0) {
+          setSelectedImageId(next.values().next().value!)
+        }
+      } else {
+        next.add(id)
+      }
+      return next
+    })
+  }, [selectedImageId])
 
   // Load scene objects on mount
   useEffect(() => {
@@ -245,12 +263,16 @@ function App() {
   }, [])
 
   const handleAcceptPlacement = useCallback(async () => {
-    if (selectedImageId != null) {
-      const t = latestTransforms.current.get(selectedImageId)
+    const idsToSave = multiSelectMode && selectedImageIds.size > 0
+      ? Array.from(selectedImageIds)
+      : (selectedImageId != null ? [selectedImageId] : [])
+
+    for (const id of idsToSave) {
+      const t = latestTransforms.current.get(id)
       if (t) {
         try {
-          const currentObj = acceptedImages.find(img => img.id === selectedImageId)
-          await fetch(`/api/scene-objects/${selectedImageId}`, {
+          const currentObj = acceptedImages.find(img => img.id === id)
+          await fetch(`/api/scene-objects/${id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -258,113 +280,153 @@ function App() {
               positionX: t.position[0], positionY: t.position[1], positionZ: t.position[2],
               rotationX: t.rotation[0], rotationY: t.rotation[1], rotationZ: t.rotation[2],
               scaleX: t.scale[0], scaleY: t.scale[1], scaleZ: t.scale[2],
-              billboard: billboardIds.has(selectedImageId),
-              character: characterIds.has(selectedImageId),
-              radius: characterRadii.get(selectedImageId) ?? 5,
-              speakingImageId: speakingImageIds.get(selectedImageId) ?? null,
+              billboard: billboardIds.has(id),
+              character: characterIds.has(id),
+              radius: characterRadii.get(id) ?? 5,
+              speakingImageId: speakingImageIds.get(id) ?? null,
             }),
           })
-          const isBillboard = billboardIds.has(selectedImageId)
-          const isCharacter = characterIds.has(selectedImageId)
-          if (isCharacter && dialogEntries.length > 0) {
-            await saveDialog(selectedImageId, dialogEntries)
-          }
-          setAcceptedImages(prev => prev.map(img =>
-            img.id === selectedImageId
-              ? { ...img, position: t.position, rotation: t.rotation, scale: t.scale, billboard: isBillboard, character: isCharacter, radius: characterRadii.get(selectedImageId) ?? 5, speakingImageId: speakingImageIds.get(selectedImageId) ?? null }
-              : img
-          ))
         } catch (err) {
           console.error('Failed to save transform', err)
         }
       }
     }
+
+    // Save dialog for single-select character
+    if (!multiSelectMode && selectedImageId != null && characterIds.has(selectedImageId) && dialogEntries.length > 0) {
+      await saveDialog(selectedImageId, dialogEntries)
+    }
+
+    // Update local state for all saved objects
+    setAcceptedImages(prev => prev.map(img => {
+      const t = latestTransforms.current.get(img.id)
+      if (idsToSave.includes(img.id) && t) {
+        return { ...img, position: t.position, rotation: t.rotation, scale: t.scale, billboard: billboardIds.has(img.id), character: characterIds.has(img.id), radius: characterRadii.get(img.id) ?? 5, speakingImageId: speakingImageIds.get(img.id) ?? null }
+      }
+      return img
+    }))
+
     setSelectionMode(false)
     setSelectedImageId(null)
+    setMultiSelectMode(false)
+    setSelectedImageIds(new Set())
     setDialogOpen(false)
     setDialogEntries([])
     setSpeakingGalleryOpen(false)
     setSwapGalleryOpen(false)
-  }, [selectedImageId, acceptedImages, billboardIds, characterIds, characterRadii, speakingImageIds, dialogEntries, saveDialog])
+  }, [selectedImageId, selectedImageIds, multiSelectMode, acceptedImages, billboardIds, characterIds, characterRadii, speakingImageIds, dialogEntries, saveDialog])
 
   const handleDuplicateObject = useCallback(async () => {
-    if (selectedImageId == null) return
-    const source = acceptedImages.find(img => img.id === selectedImageId)
-    if (!source) return
+    const idsToDuplicate = multiSelectMode && selectedImageIds.size > 0
+      ? Array.from(selectedImageIds)
+      : (selectedImageId != null ? [selectedImageId] : [])
+    if (idsToDuplicate.length === 0) return
+
     try {
-      // First accept placement of the current object
-      const t = latestTransforms.current.get(selectedImageId)
-      if (t) {
-        await fetch(`/api/scene-objects/${selectedImageId}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            positionX: t.position[0], positionY: t.position[1], positionZ: t.position[2],
-            rotationX: t.rotation[0], rotationY: t.rotation[1], rotationZ: t.rotation[2],
-            scaleX: t.scale[0], scaleY: t.scale[1], scaleZ: t.scale[2],
-            billboard: billboardIds.has(selectedImageId),
-            character: characterIds.has(selectedImageId),
-            radius: characterRadii.get(selectedImageId) ?? 5,
-            speakingImageId: speakingImageIds.get(selectedImageId) ?? null,
-          }),
-        })
-        const isBillboard = billboardIds.has(selectedImageId)
-        const isCharacter = characterIds.has(selectedImageId)
-        if (isCharacter && dialogEntries.length > 0) {
-          await saveDialog(selectedImageId, dialogEntries)
+      // First save all source objects
+      for (const id of idsToDuplicate) {
+        const t = latestTransforms.current.get(id)
+        if (t) {
+          await fetch(`/api/scene-objects/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              positionX: t.position[0], positionY: t.position[1], positionZ: t.position[2],
+              rotationX: t.rotation[0], rotationY: t.rotation[1], rotationZ: t.rotation[2],
+              scaleX: t.scale[0], scaleY: t.scale[1], scaleZ: t.scale[2],
+              billboard: billboardIds.has(id),
+              character: characterIds.has(id),
+              radius: characterRadii.get(id) ?? 5,
+              speakingImageId: speakingImageIds.get(id) ?? null,
+            }),
+          })
         }
-        setAcceptedImages(prev => prev.map(img =>
-          img.id === selectedImageId
-            ? { ...img, position: t.position, rotation: t.rotation, scale: t.scale, billboard: isBillboard, character: isCharacter, radius: characterRadii.get(selectedImageId) ?? 5, speakingImageId: speakingImageIds.get(selectedImageId) ?? null }
-            : img
-        ))
       }
 
-      // Create duplicate scene object with same imageId
-      const res = await fetch('/api/scene-objects', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageId: source.imageId }),
-      })
-      const { id: newId } = await res.json()
+      // Update local state for saved sources
+      setAcceptedImages(prev => prev.map(img => {
+        const t = latestTransforms.current.get(img.id)
+        if (idsToDuplicate.includes(img.id) && t) {
+          return { ...img, position: t.position, rotation: t.rotation, scale: t.scale, billboard: billboardIds.has(img.id), character: characterIds.has(img.id) }
+        }
+        return img
+      }))
 
-      // Copy scale from source, offset position slightly
-      const srcPos = t?.position ?? source.position ?? [0, 0, 0]
-      const srcScale = t?.scale ?? source.scale ?? [1, 1, 1]
-      const newPos: [number, number, number] = [srcPos[0] + 1, srcPos[1], srcPos[2]]
+      // Create duplicates
+      const newIds: number[] = []
+      const newImages: AcceptedImage[] = []
+      for (const id of idsToDuplicate) {
+        const source = acceptedImages.find(img => img.id === id)
+        if (!source) continue
+        const t = latestTransforms.current.get(id)
 
-      setAcceptedImages(prev => [...prev, {
-        id: newId,
-        imageId: source.imageId,
-        url: source.url,
-        position: newPos,
-        scale: [...srcScale] as [number, number, number],
-      }])
+        const res = await fetch('/api/scene-objects', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ imageId: source.imageId }),
+        })
+        const { id: newId } = await res.json()
+
+        const srcPos = t?.position ?? source.position ?? [0, 0, 0]
+        const srcRot = t?.rotation ?? source.rotation
+        const srcScale = t?.scale ?? source.scale ?? [1, 1, 1]
+        const newPos: [number, number, number] = [srcPos[0] + 1, srcPos[1], srcPos[2]]
+
+        newIds.push(newId)
+        newImages.push({
+          id: newId,
+          imageId: source.imageId,
+          url: source.url,
+          position: newPos,
+          rotation: srcRot ? [...srcRot] as [number, number, number] : undefined,
+          scale: [...srcScale] as [number, number, number],
+        })
+      }
+
+      setAcceptedImages(prev => [...prev, ...newImages])
 
       setDialogOpen(false)
       setDialogEntries([])
       setSpeakingGalleryOpen(false)
-      setSelectedImageId(newId)
+      setSwapGalleryOpen(false)
+
+      if (multiSelectMode && newIds.length > 1) {
+        // Stay in multi-select mode with the new duplicates selected
+        setSelectedImageId(newIds[0])
+        setSelectedImageIds(new Set(newIds))
+        setMultiSelectMode(true)
+      } else {
+        setSelectedImageId(newIds[0])
+        setMultiSelectMode(false)
+        setSelectedImageIds(new Set())
+      }
       setSelectionMode(true)
       setTransformMode('translate')
     } catch (err) {
       console.error('Failed to duplicate object', err)
     }
-  }, [selectedImageId, acceptedImages, billboardIds, characterIds, characterRadii, speakingImageIds, dialogEntries, saveDialog])
+  }, [selectedImageId, selectedImageIds, multiSelectMode, acceptedImages, billboardIds, characterIds, characterRadii, speakingImageIds, dialogEntries, saveDialog])
 
   const handleRemoveObject = useCallback(async () => {
-    if (selectedImageId == null) return
+    const idsToRemove = multiSelectMode && selectedImageIds.size > 0
+      ? Array.from(selectedImageIds)
+      : (selectedImageId != null ? [selectedImageId] : [])
+    if (idsToRemove.length === 0) return
+
     try {
-      await fetch(`/api/scene-objects/${selectedImageId}`, { method: 'DELETE' })
-      setAcceptedImages(prev => prev.filter(img => img.id !== selectedImageId))
+      for (const id of idsToRemove) {
+        await fetch(`/api/scene-objects/${id}`, { method: 'DELETE' })
+      }
+      const removeSet = new Set(idsToRemove)
+      setAcceptedImages(prev => prev.filter(img => !removeSet.has(img.id)))
       setBillboardIds(prev => {
         const next = new Set(prev)
-        next.delete(selectedImageId!)
+        for (const id of idsToRemove) next.delete(id)
         return next
       })
       setCharacterIds(prev => {
         const next = new Set(prev)
-        next.delete(selectedImageId!)
+        for (const id of idsToRemove) next.delete(id)
         return next
       })
     } catch (err) {
@@ -372,7 +434,9 @@ function App() {
     }
     setSelectionMode(false)
     setSelectedImageId(null)
-  }, [selectedImageId])
+    setMultiSelectMode(false)
+    setSelectedImageIds(new Set())
+  }, [selectedImageId, selectedImageIds, multiSelectMode])
 
   const togglePanel = useCallback(() => {
     setPanelOpen(prev => !prev)
@@ -576,6 +640,9 @@ function App() {
         acceptedImages={acceptedImages}
         selectionMode={selectionMode}
         selectedImageId={selectedImageId}
+        selectedImageIds={selectedImageIds}
+        multiSelectMode={multiSelectMode}
+        onMultiSelectToggle={handleMultiSelectToggle}
         onHoldStart={handleHoldStart}
         onHoldEnd={handleHoldEnd}
         transformMode={transformMode}
@@ -832,6 +899,22 @@ function App() {
           </div>
           <div className="action-buttons-row">
             <button
+              className={`billboard-btn ${multiSelectMode ? 'active' : ''}`}
+              onClick={() => {
+                if (multiSelectMode) {
+                  setMultiSelectMode(false)
+                  setSelectedImageIds(new Set())
+                } else {
+                  setMultiSelectMode(true)
+                  if (selectedImageId != null) {
+                    setSelectedImageIds(new Set([selectedImageId]))
+                  }
+                }
+              }}
+            >
+              Multi Select{multiSelectMode && selectedImageIds.size > 0 ? ` (${selectedImageIds.size})` : ''}
+            </button>
+            <button
               className="snap-ground-btn"
               onClick={() => setSnapToGroundTrigger(n => n + 1)}
             >
@@ -970,66 +1053,42 @@ function App() {
             <span className="snap-rotation-label">90&deg;</span>
             <button
               className="snap-rotation-btn"
-              onClick={() => {
-                const t = latestTransforms.current.get(selectedImageId!)
-                const cur = t?.rotation || [0, 0, 0]
-                setSnapRotationTrigger(prev => ({ rotation: [cur[0] + Math.PI / 2, cur[1], cur[2]], counter: prev.counter + 1 }))
-              }}
+              onClick={() => setSnapRotationTrigger(prev => ({ rotation: [Math.PI / 2, 0, 0], counter: prev.counter + 1, delta: true }))}
               title="Rotate +90° on X axis"
             >
               X+
             </button>
             <button
               className="snap-rotation-btn"
-              onClick={() => {
-                const t = latestTransforms.current.get(selectedImageId!)
-                const cur = t?.rotation || [0, 0, 0]
-                setSnapRotationTrigger(prev => ({ rotation: [cur[0] - Math.PI / 2, cur[1], cur[2]], counter: prev.counter + 1 }))
-              }}
+              onClick={() => setSnapRotationTrigger(prev => ({ rotation: [-Math.PI / 2, 0, 0], counter: prev.counter + 1, delta: true }))}
               title="Rotate -90° on X axis"
             >
               X-
             </button>
             <button
               className="snap-rotation-btn"
-              onClick={() => {
-                const t = latestTransforms.current.get(selectedImageId!)
-                const cur = t?.rotation || [0, 0, 0]
-                setSnapRotationTrigger(prev => ({ rotation: [cur[0], cur[1] + Math.PI / 2, cur[2]], counter: prev.counter + 1 }))
-              }}
+              onClick={() => setSnapRotationTrigger(prev => ({ rotation: [0, Math.PI / 2, 0], counter: prev.counter + 1, delta: true }))}
               title="Rotate +90° on Y axis"
             >
               Y+
             </button>
             <button
               className="snap-rotation-btn"
-              onClick={() => {
-                const t = latestTransforms.current.get(selectedImageId!)
-                const cur = t?.rotation || [0, 0, 0]
-                setSnapRotationTrigger(prev => ({ rotation: [cur[0], cur[1] - Math.PI / 2, cur[2]], counter: prev.counter + 1 }))
-              }}
+              onClick={() => setSnapRotationTrigger(prev => ({ rotation: [0, -Math.PI / 2, 0], counter: prev.counter + 1, delta: true }))}
               title="Rotate -90° on Y axis"
             >
               Y-
             </button>
             <button
               className="snap-rotation-btn"
-              onClick={() => {
-                const t = latestTransforms.current.get(selectedImageId!)
-                const cur = t?.rotation || [0, 0, 0]
-                setSnapRotationTrigger(prev => ({ rotation: [cur[0], cur[1], cur[2] + Math.PI / 2], counter: prev.counter + 1 }))
-              }}
+              onClick={() => setSnapRotationTrigger(prev => ({ rotation: [0, 0, Math.PI / 2], counter: prev.counter + 1, delta: true }))}
               title="Rotate +90° on Z axis"
             >
               Z+
             </button>
             <button
               className="snap-rotation-btn"
-              onClick={() => {
-                const t = latestTransforms.current.get(selectedImageId!)
-                const cur = t?.rotation || [0, 0, 0]
-                setSnapRotationTrigger(prev => ({ rotation: [cur[0], cur[1], cur[2] - Math.PI / 2], counter: prev.counter + 1 }))
-              }}
+              onClick={() => setSnapRotationTrigger(prev => ({ rotation: [0, 0, -Math.PI / 2], counter: prev.counter + 1, delta: true }))}
               title="Rotate -90° on Z axis"
             >
               Z-
@@ -1227,6 +1286,7 @@ function App() {
           </button>
           <div className="selection-hint">
             <kbd>Enter</kbd> or <kbd>Esc</kbd> to confirm &middot; <kbd>Del</kbd> to remove
+            {multiSelectMode && ' \u00b7 Click objects to add/remove from selection'}
           </div>
         </div>
       )}

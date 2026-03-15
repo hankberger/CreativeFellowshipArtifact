@@ -526,21 +526,50 @@ const GROUND_Y = -1
 
 function SelectionModeControls({
   selectedImageId,
+  selectedImageIds,
+  multiSelectMode,
   transformMode,
   onTransformUpdate,
   snapToGroundTrigger,
   snapRotationTrigger,
 }: {
   selectedImageId: number | null
+  selectedImageIds: Set<number>
+  multiSelectMode: boolean
   transformMode: 'translate' | 'rotate' | 'scale'
   onTransformUpdate?: (id: number, position: [number, number, number], rotation: [number, number, number], scale: [number, number, number]) => void
   snapToGroundTrigger: number
-  snapRotationTrigger: { rotation: [number, number, number]; counter: number }
+  snapRotationTrigger: { rotation: [number, number, number]; counter: number; delta?: boolean }
 }) {
   const { scene, camera } = useThree()
   const orbitRef = useRef<OrbitControlsImpl>(null!)
   const transformRef = useRef<any>(null!)
   const [targetObject, setTargetObject] = useState<THREE.Object3D | null>(null)
+
+  // Multi-select drag tracking
+  const isDragging = useRef(false)
+  const dragStartTransforms = useRef<Map<number, { position: THREE.Vector3; rotation: THREE.Euler; scale: THREE.Vector3 }>>(new Map())
+
+  // Helper to find scene object by imageId
+  const findObjectById = useCallback((id: number): THREE.Object3D | null => {
+    let result: THREE.Object3D | null = null
+    scene.traverse((obj) => {
+      if (obj.userData.imageId === id) result = obj
+    })
+    return result
+  }, [scene])
+
+  // Report transform for an object
+  const reportTransform = useCallback((obj: THREE.Object3D, id: number) => {
+    if (onTransformUpdate) {
+      onTransformUpdate(
+        id,
+        [obj.position.x, obj.position.y, obj.position.z],
+        [obj.rotation.x, obj.rotation.y, obj.rotation.z],
+        [obj.scale.x, obj.scale.y, obj.scale.z],
+      )
+    }
+  }, [onTransformUpdate])
 
   // Find the target object when selectedImageId changes
   useEffect(() => {
@@ -548,25 +577,44 @@ function SelectionModeControls({
       setTargetObject(null)
       return
     }
-    let result: THREE.Object3D | null = null
-    scene.traverse((obj) => {
-      if (obj.userData.imageId === selectedImageId) {
-        result = obj
-      }
-    })
-    setTargetObject(result)
-  }, [selectedImageId, scene])
+    setTargetObject(findObjectById(selectedImageId))
+  }, [selectedImageId, scene, findObjectById])
 
   // Retry finding the target if not found initially (e.g. texture still loading)
+  // Also apply multi-select transforms during drag
   useFrame(() => {
     if (selectedImageId != null && !targetObject) {
-      let result: THREE.Object3D | null = null
-      scene.traverse((obj) => {
-        if (obj.userData.imageId === selectedImageId) {
-          result = obj
-        }
-      })
+      const result = findObjectById(selectedImageId)
       if (result) setTargetObject(result)
+    }
+
+    // Apply multi-select transforms during drag
+    if (isDragging.current && multiSelectMode && targetObject && selectedImageId != null) {
+      const primaryStart = dragStartTransforms.current.get(selectedImageId)
+      if (!primaryStart) return
+
+      for (const [id, start] of dragStartTransforms.current) {
+        if (id === selectedImageId) continue
+        const obj = findObjectById(id)
+        if (!obj) continue
+
+        if (transformMode === 'translate') {
+          const delta = new THREE.Vector3().subVectors(targetObject.position, primaryStart.position)
+          obj.position.copy(start.position.clone().add(delta))
+        } else if (transformMode === 'rotate') {
+          obj.rotation.set(
+            start.rotation.x + (targetObject.rotation.x - primaryStart.rotation.x),
+            start.rotation.y + (targetObject.rotation.y - primaryStart.rotation.y),
+            start.rotation.z + (targetObject.rotation.z - primaryStart.rotation.z),
+          )
+        } else if (transformMode === 'scale') {
+          obj.scale.set(
+            start.scale.x * (primaryStart.scale.x !== 0 ? targetObject.scale.x / primaryStart.scale.x : 1),
+            start.scale.y * (primaryStart.scale.y !== 0 ? targetObject.scale.y / primaryStart.scale.y : 1),
+            start.scale.z * (primaryStart.scale.z !== 0 ? targetObject.scale.z / primaryStart.scale.z : 1),
+          )
+        }
+      }
     }
   })
 
@@ -590,26 +638,26 @@ function SelectionModeControls({
 
   // Snap to ground when trigger changes
   useEffect(() => {
-    if (snapToGroundTrigger === 0 || !targetObject) return
+    if (snapToGroundTrigger === 0) return
 
-    // Compute the world-space bounding box of the object
-    const box = new THREE.Box3().setFromObject(targetObject)
-    const minY = box.min.y
-    const offset = minY - GROUND_Y
-    targetObject.position.y -= offset - 0.01
+    const idsToSnap = multiSelectMode && selectedImageIds.size > 0
+      ? Array.from(selectedImageIds)
+      : (selectedImageId != null ? [selectedImageId] : [])
 
-    // Report updated transform
-    if (onTransformUpdate && selectedImageId != null) {
-      onTransformUpdate(
-        selectedImageId,
-        [targetObject.position.x, targetObject.position.y, targetObject.position.z],
-        [targetObject.rotation.x, targetObject.rotation.y, targetObject.rotation.z],
-        [targetObject.scale.x, targetObject.scale.y, targetObject.scale.z],
-      )
+    for (const id of idsToSnap) {
+      const obj = findObjectById(id)
+      if (!obj) continue
+
+      const box = new THREE.Box3().setFromObject(obj)
+      const minY = box.min.y
+      const offset = minY - GROUND_Y
+      obj.position.y -= offset - 0.01
+
+      reportTransform(obj, id)
     }
 
     // Update orbit target
-    if (orbitRef.current) {
+    if (orbitRef.current && targetObject) {
       const pos = new THREE.Vector3()
       targetObject.getWorldPosition(pos)
       orbitRef.current.target.copy(pos)
@@ -619,18 +667,29 @@ function SelectionModeControls({
 
   // Snap rotation when trigger changes
   useEffect(() => {
-    if (snapRotationTrigger.counter === 0 || !targetObject || selectedImageId == null) return
+    if (snapRotationTrigger.counter === 0 || selectedImageId == null) return
 
     const [rx, ry, rz] = snapRotationTrigger.rotation
-    targetObject.rotation.set(rx, ry, rz)
+    const isDelta = snapRotationTrigger.delta === true
+    const idsToSnap = multiSelectMode && selectedImageIds.size > 0
+      ? Array.from(selectedImageIds)
+      : [selectedImageId]
 
-    if (onTransformUpdate) {
-      onTransformUpdate(
-        selectedImageId,
-        [targetObject.position.x, targetObject.position.y, targetObject.position.z],
-        [rx, ry, rz],
-        [targetObject.scale.x, targetObject.scale.y, targetObject.scale.z],
-      )
+    for (const id of idsToSnap) {
+      const obj = findObjectById(id)
+      if (!obj) continue
+
+      if (isDelta) {
+        obj.rotation.set(
+          obj.rotation.x + rx,
+          obj.rotation.y + ry,
+          obj.rotation.z + rz,
+        )
+      } else {
+        obj.rotation.set(rx, ry, rz)
+      }
+
+      reportTransform(obj, id)
     }
 
     if (orbitRef.current) {
@@ -638,31 +697,60 @@ function SelectionModeControls({
     }
   }, [snapRotationTrigger])
 
-  // Listen for drag-end on TransformControls to report updated transform
+  // Listen for drag start/end on TransformControls
   useEffect(() => {
     const ctrl = transformRef.current
     if (!ctrl || !targetObject || selectedImageId == null) return
 
-    const handleMouseUp = () => {
-      if (onTransformUpdate && targetObject) {
-        onTransformUpdate(
-          selectedImageId,
-          [targetObject.position.x, targetObject.position.y, targetObject.position.z],
-          [targetObject.rotation.x, targetObject.rotation.y, targetObject.rotation.z],
-          [targetObject.scale.x, targetObject.scale.y, targetObject.scale.z],
-        )
+    const handleMouseDown = () => {
+      isDragging.current = true
+      dragStartTransforms.current = new Map()
+
+      if (multiSelectMode) {
+        for (const id of selectedImageIds) {
+          const obj = findObjectById(id)
+          if (obj) {
+            dragStartTransforms.current.set(id, {
+              position: obj.position.clone(),
+              rotation: obj.rotation.clone(),
+              scale: obj.scale.clone(),
+            })
+          }
+        }
       }
+    }
+
+    const handleMouseUp = () => {
+      isDragging.current = false
+
+      // Report transforms for all affected objects
+      if (multiSelectMode && selectedImageIds.size > 0) {
+        for (const id of selectedImageIds) {
+          const obj = findObjectById(id)
+          if (obj) reportTransform(obj, id)
+        }
+      } else {
+        reportTransform(targetObject, selectedImageId)
+      }
+
+      // Update orbit target
       if (orbitRef.current && targetObject) {
         const pos = new THREE.Vector3()
         targetObject.getWorldPosition(pos)
         orbitRef.current.target.copy(pos)
         orbitRef.current.update()
       }
+
+      dragStartTransforms.current = new Map()
     }
 
+    ctrl.addEventListener('mouseDown', handleMouseDown)
     ctrl.addEventListener('mouseUp', handleMouseUp)
-    return () => ctrl.removeEventListener('mouseUp', handleMouseUp)
-  }, [targetObject, selectedImageId, onTransformUpdate])
+    return () => {
+      ctrl.removeEventListener('mouseDown', handleMouseDown)
+      ctrl.removeEventListener('mouseUp', handleMouseUp)
+    }
+  }, [targetObject, selectedImageId, selectedImageIds, multiSelectMode, onTransformUpdate, findObjectById, reportTransform])
 
   return (
     <>
@@ -850,17 +938,73 @@ function DialogCameraController({ target, dialogActive }: {
   return null
 }
 
+function MultiSelectClickHandler({ onToggle }: { onToggle: (id: number) => void }) {
+  const { camera, scene, gl } = useThree()
+  const raycasterRef = useRef(new THREE.Raycaster())
+  const mouseDownPos = useRef<{ x: number; y: number } | null>(null)
+  const onToggleRef = useRef(onToggle)
+  onToggleRef.current = onToggle
+
+  useEffect(() => {
+    const canvas = gl.domElement
+
+    const onMouseDown = (e: MouseEvent) => {
+      mouseDownPos.current = { x: e.clientX, y: e.clientY }
+    }
+
+    const onMouseUp = (e: MouseEvent) => {
+      if (!mouseDownPos.current) return
+      const dx = e.clientX - mouseDownPos.current.x
+      const dy = e.clientY - mouseDownPos.current.y
+      mouseDownPos.current = null
+
+      // Only count as click if mouse barely moved
+      if (Math.sqrt(dx * dx + dy * dy) > 5) return
+
+      const rect = canvas.getBoundingClientRect()
+      const x = ((e.clientX - rect.left) / rect.width) * 2 - 1
+      const y = -((e.clientY - rect.top) / rect.height) * 2 + 1
+
+      raycasterRef.current.setFromCamera(new THREE.Vector2(x, y), camera)
+      const intersects = raycasterRef.current.intersectObjects(scene.children, true)
+
+      for (const hit of intersects) {
+        let obj: THREE.Object3D | null = hit.object
+        while (obj) {
+          if (obj.userData.imageId != null) {
+            onToggleRef.current(obj.userData.imageId as number)
+            return
+          }
+          obj = obj.parent
+        }
+      }
+    }
+
+    canvas.addEventListener('mousedown', onMouseDown)
+    canvas.addEventListener('mouseup', onMouseUp)
+    return () => {
+      canvas.removeEventListener('mousedown', onMouseDown)
+      canvas.removeEventListener('mouseup', onMouseUp)
+    }
+  }, [camera, scene, gl])
+
+  return null
+}
+
 interface ThreeSceneProps {
   panelOpen: boolean
   acceptedImages: AcceptedImage[]
   selectionMode: boolean
   selectedImageId: number | null
+  selectedImageIds: Set<number>
+  multiSelectMode: boolean
+  onMultiSelectToggle: (id: number) => void
   onHoldStart: (id: number) => void
   onHoldEnd: () => void
   transformMode: 'translate' | 'rotate' | 'scale'
   onTransformUpdate: (id: number, position: [number, number, number], rotation: [number, number, number], scale: [number, number, number]) => void
   snapToGroundTrigger: number
-  snapRotationTrigger: { rotation: [number, number, number]; counter: number }
+  snapRotationTrigger: { rotation: [number, number, number]; counter: number; delta?: boolean }
   billboardIds: Set<number>
   characterIds: Set<number>
   characterRadii: Map<number, number>
@@ -877,6 +1021,9 @@ export default function ThreeScene({
   acceptedImages,
   selectionMode,
   selectedImageId,
+  selectedImageIds,
+  multiSelectMode,
+  onMultiSelectToggle,
   onHoldStart,
   onHoldEnd,
   transformMode,
@@ -895,7 +1042,7 @@ export default function ThreeScene({
 }: ThreeSceneProps) {
   return (
     <Canvas
-      camera={{ position: [0, PLAYER_HEIGHT, 5], fov: 60 }}
+      camera={{ position: [0, PLAYER_HEIGHT, 5], fov: 60, rotation: [-0.15, 0, 0] }}
       style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', zIndex: 0 }}
     >
       <Environment files="/sky.hdr" background environmentIntensity={0.08} backgroundIntensity={0.25} />
@@ -914,9 +1061,14 @@ export default function ThreeScene({
         onCharacterProximity={onCharacterProximity}
         disabled={selectionMode || panelOpen || dialogActive}
       />
+      {selectionMode && multiSelectMode && (
+        <MultiSelectClickHandler onToggle={onMultiSelectToggle} />
+      )}
       {selectionMode && (
         <SelectionModeControls
           selectedImageId={selectedImageId}
+          selectedImageIds={selectedImageIds}
+          multiSelectMode={multiSelectMode}
           transformMode={transformMode}
           onTransformUpdate={onTransformUpdate}
           snapToGroundTrigger={snapToGroundTrigger}
@@ -930,7 +1082,7 @@ export default function ThreeScene({
             key={img.id}
             id={img.id}
             url={img.url}
-            selected={selectedImageId === img.id}
+            selected={selectedImageId === img.id || selectedImageIds.has(img.id)}
             savedPosition={img.position}
             savedRotation={img.rotation}
             savedScale={img.scale}
