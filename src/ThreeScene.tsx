@@ -206,7 +206,7 @@ function ImagePlane({
   url, id, selected,
   savedPosition, savedRotation, savedScale,
   onTransformUpdate, billboard, character,
-  speakingImageUrl, isSpeaking,
+  speakingImageUrl, isSpeaking, onTextureLoaded,
 }: {
   url: string; id: number; selected: boolean;
   savedPosition?: [number, number, number];
@@ -217,6 +217,7 @@ function ImagePlane({
   character?: boolean;
   speakingImageUrl?: string | null;
   isSpeaking?: boolean;
+  onTextureLoaded?: () => void;
 }) {
   const groupRef = useRef<THREE.Group>(null!)
   const chatBubbleRef = useRef<THREE.Group>(null!)
@@ -346,6 +347,7 @@ function ImagePlane({
       }
 
       setTexture(tex)
+      onTextureLoaded?.()
     })
   }, [url])
 
@@ -1014,6 +1016,7 @@ interface ThreeSceneProps {
   dialogActive: boolean
   getCameraStateRef: React.MutableRefObject<(() => { position: [number, number, number]; quaternion: [number, number, number, number] }) | null>
   dialogCameraTarget: { camPos: [number, number, number] | null; camQuat: [number, number, number, number] | null } | null
+  onTextureLoaded?: () => void
 }
 
 export default function ThreeScene({
@@ -1039,6 +1042,7 @@ export default function ThreeScene({
   dialogActive,
   getCameraStateRef,
   dialogCameraTarget,
+  onTextureLoaded,
 }: ThreeSceneProps) {
   return (
     <Canvas
@@ -1091,6 +1095,7 @@ export default function ThreeScene({
             character={characterIds.has(img.id)}
             speakingImageUrl={speakingImgId ? `/images/${speakingImgId}.webp` : null}
             isSpeaking={speakingCharacterId === img.id}
+            onTextureLoaded={onTextureLoaded}
           />
         )
       })}
