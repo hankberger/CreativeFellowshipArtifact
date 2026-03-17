@@ -74,6 +74,78 @@ interface AcceptedImage {
 }
 
 const HOLD_DURATION = 2000
+const IS_MOBILE = window.matchMedia('(pointer: coarse)').matches && window.innerWidth < 1024
+
+function VirtualJoystick({ moveRef }: { moveRef: React.MutableRefObject<{ x: number; y: number }> }) {
+  const stickRef = useRef<HTMLDivElement>(null)
+  const baseRef = useRef<HTMLDivElement>(null)
+  const touchIdRef = useRef<number | null>(null)
+  const centerRef = useRef({ x: 0, y: 0 })
+  const RADIUS = 40
+
+  const updatePosition = (clientX: number, clientY: number) => {
+    let dx = clientX - centerRef.current.x
+    let dy = clientY - centerRef.current.y
+    const dist = Math.sqrt(dx * dx + dy * dy)
+    if (dist > RADIUS) {
+      dx = (dx / dist) * RADIUS
+      dy = (dy / dist) * RADIUS
+    }
+    moveRef.current = { x: dx / RADIUS, y: dy / RADIUS }
+    if (stickRef.current) {
+      stickRef.current.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`
+    }
+  }
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (touchIdRef.current !== null) return
+    const touch = e.changedTouches[0]
+    touchIdRef.current = touch.identifier
+    const rect = baseRef.current!.getBoundingClientRect()
+    centerRef.current = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }
+    updatePosition(touch.clientX, touch.clientY)
+  }
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    for (let i = 0; i < e.changedTouches.length; i++) {
+      const touch = e.changedTouches[i]
+      if (touch.identifier === touchIdRef.current) {
+        updatePosition(touch.clientX, touch.clientY)
+        break
+      }
+    }
+  }
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    for (let i = 0; i < e.changedTouches.length; i++) {
+      if (e.changedTouches[i].identifier === touchIdRef.current) {
+        touchIdRef.current = null
+        moveRef.current = { x: 0, y: 0 }
+        if (stickRef.current) {
+          stickRef.current.style.transform = 'translate(-50%, -50%)'
+        }
+        break
+      }
+    }
+  }
+
+  return (
+    <div
+      ref={baseRef}
+      className="virtual-joystick"
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      onTouchCancel={handleTouchEnd}
+    >
+      <div ref={stickRef} className="virtual-joystick-stick" />
+    </div>
+  )
+}
 
 function App() {
   const [prompt, setPrompt] = useState('A cathedral made entirely of ice, with colored light refracting through its translucent walls')
@@ -118,6 +190,9 @@ function App() {
   // Ref to get camera state from ThreeScene
   const getCameraStateRef = useRef<(() => { position: [number, number, number]; quaternion: [number, number, number, number] }) | null>(null)
 
+  // Mobile controls
+  const mobileMove = useRef({ x: 0, y: 0 })
+
   // Hold-to-select state
   const [holdTarget, setHoldTarget] = useState<number | null>(null)
   const [holdProgress, setHoldProgress] = useState(0)
@@ -134,7 +209,7 @@ function App() {
     texturesLoadedCount.current++
     if (texturesLoadedCount.current >= sceneObjectCount.current) {
       setSceneLoadingFadeOut(true)
-      setTimeout(() => setSceneLoading(false), 800)
+      setTimeout(() => setSceneLoading(false), 2600)
     }
   }, [])
 
@@ -161,7 +236,7 @@ function App() {
     const safetyTimeout = setTimeout(() => {
       if (sceneLoading) {
         setSceneLoadingFadeOut(true)
-        setTimeout(() => setSceneLoading(false), 800)
+        setTimeout(() => setSceneLoading(false), 2600)
       }
     }, 15000);
 
@@ -174,7 +249,7 @@ function App() {
           texturesLoadedCount.current = 0
           if (data.length === 0) {
             setSceneLoadingFadeOut(true)
-            setTimeout(() => setSceneLoading(false), 800)
+            setTimeout(() => setSceneLoading(false), 2600)
           }
           setAcceptedImages(data)
           setBillboardIds(new Set(data.filter((d: AcceptedImage) => d.billboard).map((d: AcceptedImage) => d.id)))
@@ -187,12 +262,12 @@ function App() {
           setSpeakingImageIds(speaking)
         } else {
           setSceneLoadingFadeOut(true)
-          setTimeout(() => setSceneLoading(false), 800)
+          setTimeout(() => setSceneLoading(false), 2600)
         }
       } catch (err) {
         console.error('Failed to load scene objects', err)
         setSceneLoadingFadeOut(true)
-        setTimeout(() => setSceneLoading(false), 800)
+        setTimeout(() => setSceneLoading(false), 2600)
       }
     })()
 
@@ -655,8 +730,8 @@ function App() {
           <div className="scene-loading-content">
             <img src="/images/9092c16a-dbe1-44a3-a903-4dd9f714da86.webp" alt="" className="scene-loading-logo" />
             <div className="scene-loading-rule" />
-            <div className="scene-loading-title">Hank's Creative Artifact</div>
-            <div className="scene-loading-subtitle">Powered by Nano Banana 2</div>
+            <div className="scene-loading-title">Banana City</div>
+            <div className="scene-loading-subtitle">Hank's Creative Artifact</div>
           </div>
         </div>
       )}
@@ -712,6 +787,8 @@ function App() {
           camQuat: activeDialog[activeDialogIndex].camQuat || null,
         } : null}
         onTextureLoaded={handleTextureLoaded}
+        mobileMove={mobileMove}
+        isMobile={IS_MOBILE}
       />
 
       {panelOpen && (
@@ -1361,14 +1438,16 @@ function App() {
             <div className="dialog-card-footer">
               <span className="dialog-card-progress">{activeDialogIndex + 1} / {activeDialog.length}</span>
               <span className="dialog-card-hint">
-                {activeDialogIndex < activeDialog.length - 1 ? 'Press Space or Click to continue' : 'Press Space or Click to close'}
+                {activeDialogIndex < activeDialog.length - 1
+                  ? (IS_MOBILE ? 'Tap to continue' : 'Press Space or Click to continue')
+                  : (IS_MOBILE ? 'Tap to close' : 'Press Space or Click to close')}
               </span>
             </div>
           </div>
         </div>
       )}
 
-      {!selectionMode && (
+      {!selectionMode && !IS_MOBILE && (
         <div className="controls-guide">
           <div className="controls-guide-title">Controls</div>
           <div className="controls-guide-body">
@@ -1395,6 +1474,15 @@ function App() {
             </div>
           </div>
         </div>
+      )}
+
+      {IS_MOBILE && !selectionMode && !panelOpen && activeDialog.length === 0 && (
+        <>
+          <VirtualJoystick moveRef={mobileMove} />
+          <button className="mobile-creator-btn" onClick={togglePanel}>
+            <span className="mobile-creator-btn-icon">+</span>
+          </button>
+        </>
       )}
     </>
   )

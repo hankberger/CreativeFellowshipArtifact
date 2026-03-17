@@ -27,7 +27,7 @@ const JUMP_VELOCITY = 6
 const GRAVITY = -15
 const STEP_HEIGHT = 0.5 // max height player can step up without jumping
 
-function FirstPersonMovement({ disabled }: { disabled: boolean }) {
+function FirstPersonMovement({ disabled, mobileMove }: { disabled: boolean; mobileMove?: React.RefObject<{ x: number; y: number }> }) {
   const { camera, scene } = useThree()
   const keys = useRef<Record<string, boolean>>({})
   const raycaster = useRef(new THREE.Raycaster())
@@ -104,31 +104,44 @@ function FirstPersonMovement({ disabled }: { disabled: boolean }) {
     right.crossVectors(forward, camera.up).normalize()
 
     const sprinting = keys.current['ShiftLeft'] || keys.current['ShiftRight']
-    const speed = MOVE_SPEED * (sprinting ? SPRINT_MULTIPLIER : 1) * delta
+    const baseSpeed = MOVE_SPEED * (sprinting ? SPRINT_MULTIPLIER : 1) * delta
 
     const origin = camera.position.clone()
-    // canMove casts rays at multiple heights from this base
 
-    if (keys.current['KeyW'] || keys.current['ArrowUp']) {
+    // Combine keyboard + mobile joystick input
+    let moveZ = 0
+    let moveX = 0
+    if (keys.current['KeyW'] || keys.current['ArrowUp']) moveZ += 1
+    if (keys.current['KeyS'] || keys.current['ArrowDown']) moveZ -= 1
+    if (keys.current['KeyA'] || keys.current['ArrowLeft']) moveX -= 1
+    if (keys.current['KeyD'] || keys.current['ArrowRight']) moveX += 1
+    if (mobileMove?.current) {
+      moveZ -= mobileMove.current.y
+      moveX += mobileMove.current.x
+    }
+
+    if (moveZ > 0.1) {
+      const speed = baseSpeed * Math.min(moveZ, 1)
       if (canMove(origin, forward, speed)) {
         camera.position.addScaledVector(forward, speed)
       }
-    }
-    if (keys.current['KeyS'] || keys.current['ArrowDown']) {
+    } else if (moveZ < -0.1) {
+      const speed = baseSpeed * Math.min(-moveZ, 1)
       const back = forward.clone().negate()
       if (canMove(origin, back, speed)) {
         camera.position.addScaledVector(forward, -speed)
       }
     }
-    if (keys.current['KeyA'] || keys.current['ArrowLeft']) {
+    if (moveX > 0.1) {
+      const speed = baseSpeed * Math.min(moveX, 1)
+      if (canMove(origin, right, speed)) {
+        camera.position.addScaledVector(right, speed)
+      }
+    } else if (moveX < -0.1) {
+      const speed = baseSpeed * Math.min(-moveX, 1)
       const left = right.clone().negate()
       if (canMove(origin, left, speed)) {
         camera.position.addScaledVector(right, -speed)
-      }
-    }
-    if (keys.current['KeyD'] || keys.current['ArrowRight']) {
-      if (canMove(origin, right, speed)) {
-        camera.position.addScaledVector(right, speed)
       }
     }
 
@@ -190,16 +203,79 @@ function FirstPersonMovement({ disabled }: { disabled: boolean }) {
   return null
 }
 
-function JsonControls({ disabled }: { disabled: boolean }) {
+function JsonControls({ disabled, isMobile }: { disabled: boolean; isMobile?: boolean }) {
   useEffect(() => {
     if (disabled && document.pointerLockElement) {
       document.exitPointerLock()
     }
   }, [disabled])
 
-  if (disabled) return null
+  if (disabled || isMobile) return null
 
   return <DreiPointerLockControls />
+}
+
+function TouchLookControls({ disabled }: { disabled: boolean }) {
+  const { camera, gl } = useThree()
+  const touchRef = useRef<{ id: number; x: number; y: number } | null>(null)
+  const euler = useRef(new THREE.Euler(0, 0, 0, 'YXZ'))
+  const disabledRef = useRef(disabled)
+  disabledRef.current = disabled
+
+  useEffect(() => {
+    const canvas = gl.domElement
+    const SENSITIVITY = 0.004
+
+    const onTouchStart = (e: TouchEvent) => {
+      if (disabledRef.current) return
+      if (touchRef.current !== null) return
+      const touch = e.changedTouches[0]
+      touchRef.current = { id: touch.identifier, x: touch.clientX, y: touch.clientY }
+    }
+
+    const onTouchMove = (e: TouchEvent) => {
+      if (!touchRef.current || disabledRef.current) return
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        const touch = e.changedTouches[i]
+        if (touch.identifier === touchRef.current.id) {
+          const dx = touch.clientX - touchRef.current.x
+          const dy = touch.clientY - touchRef.current.y
+          touchRef.current.x = touch.clientX
+          touchRef.current.y = touch.clientY
+          euler.current.setFromQuaternion(camera.quaternion)
+          euler.current.y -= dx * SENSITIVITY
+          euler.current.x -= dy * SENSITIVITY
+          euler.current.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, euler.current.x))
+          camera.quaternion.setFromEuler(euler.current)
+          break
+        }
+      }
+    }
+
+    const onTouchEnd = (e: TouchEvent) => {
+      if (!touchRef.current) return
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        if (e.changedTouches[i].identifier === touchRef.current.id) {
+          touchRef.current = null
+          break
+        }
+      }
+    }
+
+    canvas.addEventListener('touchstart', onTouchStart, { passive: true })
+    canvas.addEventListener('touchmove', onTouchMove, { passive: true })
+    canvas.addEventListener('touchend', onTouchEnd, { passive: true })
+    canvas.addEventListener('touchcancel', onTouchEnd, { passive: true })
+
+    return () => {
+      canvas.removeEventListener('touchstart', onTouchStart)
+      canvas.removeEventListener('touchmove', onTouchMove)
+      canvas.removeEventListener('touchend', onTouchEnd)
+      canvas.removeEventListener('touchcancel', onTouchEnd)
+    }
+  }, [camera, gl])
+
+  return null
 }
 
 function ImagePlane({
@@ -475,11 +551,19 @@ function HoldToSelect({ disabled, onHoldStart, onHoldEnd }: { disabled: boolean;
       }
     }
 
+    const handleTouchStart = () => handleMouseDown()
+    const handleTouchEnd = () => handleMouseUp()
     document.addEventListener('mousedown', handleMouseDown)
     document.addEventListener('mouseup', handleMouseUp)
+    document.addEventListener('touchstart', handleTouchStart, { passive: true })
+    document.addEventListener('touchend', handleTouchEnd, { passive: true })
+    document.addEventListener('touchcancel', handleTouchEnd, { passive: true })
     return () => {
       document.removeEventListener('mousedown', handleMouseDown)
       document.removeEventListener('mouseup', handleMouseUp)
+      document.removeEventListener('touchstart', handleTouchStart)
+      document.removeEventListener('touchend', handleTouchEnd)
+      document.removeEventListener('touchcancel', handleTouchEnd)
     }
   }, [getHitImageId, onHoldStart, onHoldEnd])
 
@@ -1017,6 +1101,8 @@ interface ThreeSceneProps {
   getCameraStateRef: React.MutableRefObject<(() => { position: [number, number, number]; quaternion: [number, number, number, number] }) | null>
   dialogCameraTarget: { camPos: [number, number, number] | null; camQuat: [number, number, number, number] | null } | null
   onTextureLoaded?: () => void
+  mobileMove?: React.RefObject<{ x: number; y: number }>
+  isMobile?: boolean
 }
 
 export default function ThreeScene({
@@ -1043,6 +1129,8 @@ export default function ThreeScene({
   getCameraStateRef,
   dialogCameraTarget,
   onTextureLoaded,
+  mobileMove,
+  isMobile,
 }: ThreeSceneProps) {
   return (
     <Canvas
@@ -1052,8 +1140,9 @@ export default function ThreeScene({
       <Environment files="/sky.hdr" background environmentIntensity={0.08} backgroundIntensity={0.25} />
       <ambientLight intensity={0.5} />
       <pointLight position={[10, 10, 10]} />
-      <JsonControls disabled={panelOpen || selectionMode} />
-      <FirstPersonMovement disabled={panelOpen || selectionMode || dialogActive} />
+      <JsonControls disabled={panelOpen || selectionMode} isMobile={isMobile} />
+      <FirstPersonMovement disabled={panelOpen || selectionMode || dialogActive} mobileMove={mobileMove} />
+      {isMobile && <TouchLookControls disabled={panelOpen || selectionMode || dialogActive} />}
       <CameraStateSaver selectionMode={selectionMode} />
       <CameraStateExposer getCameraStateRef={getCameraStateRef} />
       <DialogCameraController target={dialogCameraTarget} dialogActive={dialogActive} />
