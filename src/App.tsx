@@ -314,6 +314,12 @@ function App() {
     setHoldProgress(0)
   }, [])
 
+  const handleMobileTapSelect = useCallback((id: number) => {
+    setSelectedImageId(id)
+    setSelectionMode(true)
+    setTransformMode('translate')
+  }, [])
+
   // Animate hold progress and trigger selection mode at completion
   useEffect(() => {
     if (holdTarget === null) return
@@ -779,6 +785,7 @@ function App() {
         onTextureLoaded={handleTextureLoaded}
         mobileMove={mobileMove}
         isMobile={IS_MOBILE}
+        onMobileTapSelect={handleMobileTapSelect}
       />
 
       {panelOpen && (

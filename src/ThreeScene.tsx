@@ -586,6 +586,60 @@ function HoldToSelect({ disabled, onHoldStart, onHoldEnd }: { disabled: boolean;
   return null
 }
 
+function MobileTapSelect({ disabled, onSelect }: { disabled: boolean; onSelect: (id: number) => void }) {
+  const { camera, scene, gl } = useThree()
+  const raycasterRef = useRef(new THREE.Raycaster())
+  const disabledRef = useRef(disabled)
+  disabledRef.current = disabled
+  const touchStartRef = useRef<{ x: number; y: number; time: number } | null>(null)
+
+  const getHitImageId = useCallback((): number | null => {
+    raycasterRef.current.setFromCamera(new THREE.Vector2(0, 0), camera)
+    const intersects = raycasterRef.current.intersectObjects(scene.children, true)
+    for (const hit of intersects) {
+      let obj: THREE.Object3D | null = hit.object
+      while (obj) {
+        if (obj.userData.imageId != null) return obj.userData.imageId as number
+        obj = obj.parent
+      }
+    }
+    return null
+  }, [camera, scene])
+
+  useEffect(() => {
+    const canvas = gl.domElement
+
+    const onTouchStart = (e: TouchEvent) => {
+      if (disabledRef.current || e.touches.length !== 1) return
+      const t = e.changedTouches[0]
+      touchStartRef.current = { x: t.clientX, y: t.clientY, time: performance.now() }
+    }
+
+    const onTouchEnd = (e: TouchEvent) => {
+      if (disabledRef.current || !touchStartRef.current) return
+      const t = e.changedTouches[0]
+      const dx = t.clientX - touchStartRef.current.x
+      const dy = t.clientY - touchStartRef.current.y
+      const elapsed = performance.now() - touchStartRef.current.time
+      touchStartRef.current = null
+      // Quick tap with minimal movement
+      if (Math.sqrt(dx * dx + dy * dy) < 15 && elapsed < 300) {
+        const id = getHitImageId()
+        if (id !== null) onSelect(id)
+      }
+    }
+
+    canvas.addEventListener('touchstart', onTouchStart, { passive: true })
+    canvas.addEventListener('touchend', onTouchEnd, { passive: true })
+    return () => {
+      canvas.removeEventListener('touchstart', onTouchStart)
+      canvas.removeEventListener('touchend', onTouchEnd)
+    }
+  }, [gl, getHitImageId, onSelect])
+
+  return null
+}
+
 function CameraStateSaver({ selectionMode }: { selectionMode: boolean }) {
   const { camera } = useThree()
   const savedState = useRef<{ position: THREE.Vector3; quaternion: THREE.Quaternion } | null>(null)
@@ -1103,6 +1157,7 @@ interface ThreeSceneProps {
   onTextureLoaded?: () => void
   mobileMove?: React.RefObject<{ x: number; y: number }>
   isMobile?: boolean
+  onMobileTapSelect?: (id: number) => void
 }
 
 export default function ThreeScene({
@@ -1131,6 +1186,7 @@ export default function ThreeScene({
   onTextureLoaded,
   mobileMove,
   isMobile,
+  onMobileTapSelect,
 }: ThreeSceneProps) {
   return (
     <Canvas
@@ -1146,7 +1202,10 @@ export default function ThreeScene({
       <CameraStateSaver selectionMode={selectionMode} />
       <CameraStateExposer getCameraStateRef={getCameraStateRef} />
       <DialogCameraController target={dialogCameraTarget} dialogActive={dialogActive} />
-      <HoldToSelect disabled={selectionMode || dialogActive} onHoldStart={onHoldStart} onHoldEnd={onHoldEnd} />
+      <HoldToSelect disabled={selectionMode || dialogActive || !!isMobile} onHoldStart={onHoldStart} onHoldEnd={onHoldEnd} />
+      {isMobile && onMobileTapSelect && (
+        <MobileTapSelect disabled={selectionMode || dialogActive || panelOpen} onSelect={onMobileTapSelect} />
+      )}
       <ProximityDetector
         acceptedImages={acceptedImages}
         characterIds={characterIds}
