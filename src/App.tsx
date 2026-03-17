@@ -652,23 +652,11 @@ function App() {
     <>
       {sceneLoading && (
         <div className={`scene-loading-overlay${sceneLoadingFadeOut ? ' fade-out' : ''}`}>
-          <div className="scene-loading-aurora" />
-          <div className="scene-loading-grid" />
-          <div className="scene-loading-scan" />
-          <div className="scene-loading-center">
-            <div className="scene-loading-ring" />
-            <div className="scene-loading-ring scene-loading-ring-inner" />
-            <div className="scene-loading-pulse" />
-          </div>
-          <div className="scene-loading-title">Ethereal Forge</div>
-          <div className="scene-loading-text">
-            Reconstructing scene
-            <span className="scene-loading-dot">.</span>
-            <span className="scene-loading-dot">.</span>
-            <span className="scene-loading-dot">.</span>
-          </div>
-          <div className="scene-loading-bar-track">
-            <div className="scene-loading-bar-fill" />
+          <div className="scene-loading-content">
+            <img src="/images/9092c16a-dbe1-44a3-a903-4dd9f714da86.webp" alt="" className="scene-loading-logo" />
+            <div className="scene-loading-rule" />
+            <div className="scene-loading-title">Hank's Creative Artifact</div>
+            <div className="scene-loading-subtitle">Powered by Nano Banana 2</div>
           </div>
         </div>
       )}
