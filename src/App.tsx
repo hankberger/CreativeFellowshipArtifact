@@ -182,7 +182,6 @@ function App() {
   const [activeDialogCharId, setActiveDialogCharId] = useState<number | null>(null)
 
   // Scene loading state
-  const [sceneLoading, setSceneLoading] = useState(true)
   const [sceneLoadingFadeOut, setSceneLoadingFadeOut] = useState(false)
   const sceneObjectCount = useRef(0)
   const texturesLoadedCount = useRef(0)
@@ -209,7 +208,6 @@ function App() {
     texturesLoadedCount.current++
     if (texturesLoadedCount.current >= sceneObjectCount.current) {
       setSceneLoadingFadeOut(true)
-      setTimeout(() => setSceneLoading(false), 2600)
     }
   }, [])
 
@@ -234,10 +232,7 @@ function App() {
   useEffect(() => {
     // Safety timeout: dismiss loading screen after 15s no matter what
     const safetyTimeout = setTimeout(() => {
-      if (sceneLoading) {
-        setSceneLoadingFadeOut(true)
-        setTimeout(() => setSceneLoading(false), 2600)
-      }
+      setSceneLoadingFadeOut(true)
     }, 15000);
 
     (async () => {
@@ -249,7 +244,6 @@ function App() {
           texturesLoadedCount.current = 0
           if (data.length === 0) {
             setSceneLoadingFadeOut(true)
-            setTimeout(() => setSceneLoading(false), 2600)
           }
           setAcceptedImages(data)
           setBillboardIds(new Set(data.filter((d: AcceptedImage) => d.billboard).map((d: AcceptedImage) => d.id)))
@@ -262,12 +256,10 @@ function App() {
           setSpeakingImageIds(speaking)
         } else {
           setSceneLoadingFadeOut(true)
-          setTimeout(() => setSceneLoading(false), 2600)
         }
       } catch (err) {
         console.error('Failed to load scene objects', err)
         setSceneLoadingFadeOut(true)
-        setTimeout(() => setSceneLoading(false), 2600)
       }
     })()
 
@@ -725,16 +717,14 @@ function App() {
 
   return (
     <>
-      {sceneLoading && (
-        <div className={`scene-loading-overlay${sceneLoadingFadeOut ? ' fade-out' : ''}`}>
-          <div className="scene-loading-content">
-            <img src="/images/9092c16a-dbe1-44a3-a903-4dd9f714da86.webp" alt="" className="scene-loading-logo" />
-            <div className="scene-loading-rule" />
-            <div className="scene-loading-title">Banana City</div>
-            <div className="scene-loading-subtitle">Hank's Creative Artifact</div>
-          </div>
+      <div className={`scene-loading-overlay${sceneLoadingFadeOut ? ' fade-out' : ''}`}>
+        <div className="scene-loading-content">
+          <img src="/images/9092c16a-dbe1-44a3-a903-4dd9f714da86.webp" alt="" className="scene-loading-logo" />
+          <div className="scene-loading-rule" />
+          <div className="scene-loading-title">Banana City</div>
+          <div className="scene-loading-subtitle">Hank's Creative Artifact</div>
         </div>
-      )}
+      </div>
       {!selectionMode && (
         <div className="crosshair-container">
           <div className="crosshair" />

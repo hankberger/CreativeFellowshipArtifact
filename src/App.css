@@ -1646,11 +1646,13 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: opacity 2.5s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: opacity 2.5s cubic-bezier(0.4, 0, 0.2, 1),
+              visibility 0s linear 2.5s;
 }
 
 .scene-loading-overlay.fade-out {
   opacity: 0;
+  visibility: hidden;
   pointer-events: none;
 }
 
