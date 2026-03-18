@@ -394,8 +394,9 @@ function App() {
       return
     }
 
-    setHoldVisible(true)
     setHoldProgress(0)
+
+    const showTimeout = setTimeout(() => setHoldVisible(true), 150)
 
     let animFrame: number
     const totalDuration = HOLD_DELAY + HOLD_DURATION
@@ -418,7 +419,10 @@ function App() {
     }
     animFrame = requestAnimationFrame(animate)
 
-    return () => cancelAnimationFrame(animFrame)
+    return () => {
+      clearTimeout(showTimeout)
+      cancelAnimationFrame(animFrame)
+    }
   }, [holdTarget])
 
   const loadDialog = useCallback(async (objectId: number) => {
