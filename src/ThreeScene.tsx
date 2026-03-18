@@ -1022,6 +1022,29 @@ function CameraStateExposer({ getCameraStateRef }: {
   return null
 }
 
+function DebugInfoUpdater({ debugRef }: {
+  debugRef: React.MutableRefObject<{ x: number; y: number; z: number; fps: number }>
+}) {
+  const { camera } = useThree()
+  const frames = useRef(0)
+  const lastTime = useRef(performance.now())
+
+  useFrame(() => {
+    debugRef.current.x = camera.position.x
+    debugRef.current.y = camera.position.y
+    debugRef.current.z = camera.position.z
+    frames.current++
+    const now = performance.now()
+    if (now - lastTime.current >= 500) {
+      debugRef.current.fps = Math.round(frames.current / ((now - lastTime.current) / 1000))
+      frames.current = 0
+      lastTime.current = now
+    }
+  })
+
+  return null
+}
+
 // LERPs the camera between dialog camera positions
 function DialogCameraController({ target, dialogActive }: {
   target: { camPos: [number, number, number] | null; camQuat: [number, number, number, number] | null } | null
@@ -1158,6 +1181,7 @@ interface ThreeSceneProps {
   mobileMove?: React.RefObject<{ x: number; y: number }>
   isMobile?: boolean
   onMobileTapSelect?: (id: number) => void
+  debugRef?: React.MutableRefObject<{ x: number; y: number; z: number; fps: number }>
 }
 
 export default function ThreeScene({
@@ -1187,6 +1211,7 @@ export default function ThreeScene({
   mobileMove,
   isMobile,
   onMobileTapSelect,
+  debugRef,
 }: ThreeSceneProps) {
   return (
     <Canvas
@@ -1201,6 +1226,7 @@ export default function ThreeScene({
       {isMobile && <TouchLookControls disabled={panelOpen || selectionMode || dialogActive} />}
       <CameraStateSaver selectionMode={selectionMode} />
       <CameraStateExposer getCameraStateRef={getCameraStateRef} />
+      {debugRef && <DebugInfoUpdater debugRef={debugRef} />}
       <DialogCameraController target={dialogCameraTarget} dialogActive={dialogActive} />
       <HoldToSelect disabled={selectionMode || dialogActive || !!isMobile} onHoldStart={onHoldStart} onHoldEnd={onHoldEnd} />
       {isMobile && onMobileTapSelect && (

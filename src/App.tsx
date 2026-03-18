@@ -189,6 +189,11 @@ function App() {
   // Ref to get camera state from ThreeScene
   const getCameraStateRef = useRef<(() => { position: [number, number, number]; quaternion: [number, number, number, number] }) | null>(null)
 
+  // Debug mode
+  const [debugMode, setDebugMode] = useState(false)
+  const debugRef = useRef({ x: 0, y: 0, z: 0, fps: 0 })
+  const [debugDisplay, setDebugDisplay] = useState({ x: 0, y: 0, z: 0, fps: 0 })
+
   // Mobile controls
   const mobileMove = useRef({ x: 0, y: 0 })
 
@@ -229,6 +234,24 @@ function App() {
 
 
   // Load scene objects on mount
+  // Debug mode toggle on semicolon key
+  useEffect(() => {
+    const handleDebugKey = (e: KeyboardEvent) => {
+      if (e.key === ';') setDebugMode(prev => !prev)
+    }
+    window.addEventListener('keydown', handleDebugKey)
+    return () => window.removeEventListener('keydown', handleDebugKey)
+  }, [])
+
+  // Update debug display from ref at interval
+  useEffect(() => {
+    if (!debugMode) return
+    const interval = setInterval(() => {
+      setDebugDisplay({ ...debugRef.current })
+    }, 200)
+    return () => clearInterval(interval)
+  }, [debugMode])
+
   useEffect(() => {
     // Safety timeout: dismiss loading screen after 15s no matter what
     const safetyTimeout = setTimeout(() => {
@@ -786,7 +809,30 @@ function App() {
         mobileMove={mobileMove}
         isMobile={IS_MOBILE}
         onMobileTapSelect={handleMobileTapSelect}
+        debugRef={debugMode ? debugRef : undefined}
       />
+
+      {debugMode && (
+        <div className="debug-overlay">
+          <div className="debug-overlay-title">Debug</div>
+          <div className="debug-overlay-row">
+            <span className="debug-overlay-label">FPS</span>
+            <span className="debug-overlay-value">{debugDisplay.fps}</span>
+          </div>
+          <div className="debug-overlay-row">
+            <span className="debug-overlay-label">X</span>
+            <span className="debug-overlay-value">{debugDisplay.x.toFixed(2)}</span>
+          </div>
+          <div className="debug-overlay-row">
+            <span className="debug-overlay-label">Y</span>
+            <span className="debug-overlay-value">{debugDisplay.y.toFixed(2)}</span>
+          </div>
+          <div className="debug-overlay-row">
+            <span className="debug-overlay-label">Z</span>
+            <span className="debug-overlay-value">{debugDisplay.z.toFixed(2)}</span>
+          </div>
+        </div>
+      )}
 
       {panelOpen && (
         <div className="floating-panel">

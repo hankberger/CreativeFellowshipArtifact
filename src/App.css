@@ -990,6 +990,48 @@
   box-shadow: 0 0 8px var(--forge-glow);
 }
 
+/* Debug overlay */
+.debug-overlay {
+  position: fixed;
+  top: 1rem;
+  left: 1rem;
+  z-index: 20;
+  background: rgba(0, 0, 0, 0.75);
+  border: 1px solid rgba(232, 168, 73, 0.3);
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 0.75rem;
+  color: var(--forge-text);
+  pointer-events: none;
+  min-width: 140px;
+}
+
+.debug-overlay-title {
+  font-family: 'Syne', sans-serif;
+  font-size: 0.55rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  color: var(--forge-gold);
+  margin-bottom: 0.35rem;
+}
+
+.debug-overlay-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.1rem 0;
+}
+
+.debug-overlay-label {
+  color: var(--forge-text-dim);
+}
+
+.debug-overlay-value {
+  color: var(--forge-text);
+  font-weight: 600;
+}
+
 /* ═══════════════════════════════════════════════
    SELECTION MODE OVERLAY
    ═══════════════════════════════════════════════ */
