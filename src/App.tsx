@@ -394,19 +394,14 @@ function App() {
       return
     }
 
+    setHoldVisible(true)
+    setHoldProgress(0)
+
     let animFrame: number
+    const totalDuration = HOLD_DELAY + HOLD_DURATION
     const animate = () => {
       const elapsed = performance.now() - holdStartTime.current
-
-      if (elapsed < HOLD_DELAY) {
-        setHoldVisible(false)
-        setHoldProgress(0)
-        animFrame = requestAnimationFrame(animate)
-        return
-      }
-
-      setHoldVisible(true)
-      const progress = Math.min((elapsed - HOLD_DELAY) / HOLD_DURATION, 1)
+      const progress = Math.min(elapsed / totalDuration, 1)
       setHoldProgress(progress)
 
       if (progress >= 1) {
