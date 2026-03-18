@@ -1,3 +1,3 @@
-# Creative Fellowship Artifact
+![Creative Fellowship Artifact](public/banana.webp)
 
-![Creative Fellowship Artifact](banana.webp)
+# Creative Fellowship Artifact

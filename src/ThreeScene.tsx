@@ -1215,11 +1215,24 @@ export default function ThreeScene({
 }: ThreeSceneProps) {
   return (
     <Canvas
+      shadows
       camera={{ position: [0, PLAYER_HEIGHT, 5], fov: 60, rotation: [-0.15, 0, 0] }}
       style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', zIndex: 0 }}
     >
       <Environment files="/sky.hdr" background environmentIntensity={0.08} backgroundIntensity={0.25} />
       <ambientLight intensity={0.5} />
+      <directionalLight
+        position={[-72, 15, 48]}
+        intensity={1}
+        castShadow
+        shadow-mapSize-width={1024}
+        shadow-mapSize-height={1024}
+        shadow-camera-far={30}
+        shadow-camera-left={-10}
+        shadow-camera-right={10}
+        shadow-camera-top={10}
+        shadow-camera-bottom={-10}
+      />
       <pointLight position={[10, 10, 10]} />
       <JsonControls disabled={panelOpen || selectionMode} isMobile={isMobile} />
       <FirstPersonMovement disabled={panelOpen || selectionMode || dialogActive} mobileMove={mobileMove} />
@@ -1285,9 +1298,13 @@ export default function ThreeScene({
         fadeDistance={60}
         infiniteGrid
       />
-      <mesh position={[-82, 2, 38]}>
+      <mesh position={[-82, 2, 38]} castShadow>
         <sphereGeometry args={[1.5, 32, 32]} />
         <meshStandardMaterial color="#ffffff" />
+      </mesh>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
+        <planeGeometry args={[200, 200]} />
+        <shadowMaterial opacity={0.3} />
       </mesh>
     </Canvas>
   )
