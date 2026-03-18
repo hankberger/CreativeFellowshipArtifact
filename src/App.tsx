@@ -618,7 +618,16 @@ function App() {
   }, [selectedImageId, selectedImageIds, multiSelectMode])
 
   const togglePanel = useCallback(() => {
-    setPanelOpen(prev => !prev)
+    setPanelOpen(prev => {
+      if (prev) {
+        // Closing panel — re-acquire pointer lock for first person controls
+        requestAnimationFrame(() => {
+          const canvas = document.querySelector('canvas')
+          if (canvas) canvas.requestPointerLock()
+        })
+      }
+      return !prev
+    })
   }, [])
 
   const activeDialogCharIdRef = useRef<number | null>(null)
