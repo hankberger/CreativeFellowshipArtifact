@@ -1881,6 +1881,113 @@
   line-height: 1;
 }
 
+/* ─── Pause overlay ─── */
+.pause-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(5, 4, 8, 0.75);
+  backdrop-filter: blur(8px);
+  cursor: pointer;
+  animation: pause-fade-in 0.2s ease-out;
+}
+
+@keyframes pause-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.pause-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 2.5rem 3rem;
+  background: var(--forge-surface);
+  border: 1px solid var(--forge-border);
+  border-radius: 16px;
+  box-shadow:
+    0 0 60px -10px var(--forge-glow),
+    0 8px 32px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+  animation: pause-card-in 0.3s ease-out;
+}
+
+@keyframes pause-card-in {
+  from { opacity: 0; transform: scale(0.95) translateY(8px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.pause-icon {
+  font-size: 1.8rem;
+  color: var(--forge-gold);
+  letter-spacing: 0.15em;
+  text-shadow: 0 0 20px var(--forge-glow-strong);
+  line-height: 1;
+}
+
+.pause-title {
+  font-family: 'Syne', sans-serif;
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--forge-gold);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  text-shadow: 0 0 20px var(--forge-glow);
+}
+
+.pause-hint {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.75rem;
+  color: var(--forge-text-dim);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  animation: cts-pulse 2.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+.pause-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin-top: 0.75rem;
+  width: 100%;
+  border-top: 1px solid var(--forge-border);
+  padding-top: 0.75rem;
+}
+
+.pause-controls-row {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.7rem;
+  color: var(--forge-text-dim);
+}
+
+.pause-controls-row span {
+  margin-left: 0.15rem;
+  font-size: 0.7rem;
+}
+
+.pause-controls-row kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.4em;
+  padding: 0.1em 0.4em;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.6rem;
+  font-weight: 500;
+  color: var(--forge-text-dim);
+  background: rgba(232, 168, 73, 0.06);
+  border: 1px solid var(--forge-border);
+  border-radius: 4px;
+  line-height: 1.4;
+}
+
 /* ─── Mobile responsive adjustments ─── */
 @media (pointer: coarse) and (max-width: 1024px) {
   .crosshair-container {

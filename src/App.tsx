@@ -197,6 +197,9 @@ function App() {
   const debugRef = useRef({ x: 0, y: 0, z: 0, fps: 0 })
   const [debugDisplay, setDebugDisplay] = useState({ x: 0, y: 0, z: 0, fps: 0 })
 
+  // Pause state (triggered when pointer lock is released via Esc)
+  const [paused, setPaused] = useState(false)
+
   // Mobile controls
   const mobileMove = useRef({ x: 0, y: 0 })
 
@@ -270,6 +273,30 @@ function App() {
       return () => document.removeEventListener('pointerlockchange', onLock)
     }
   }, [hasInteracted])
+
+  // Detect pointer lock release to show pause menu (desktop only)
+  useEffect(() => {
+    if (IS_MOBILE) return
+    const onPointerLockChange = () => {
+      if (!document.pointerLockElement) {
+        // Only pause if we're in normal gameplay (not panel/selection open)
+        setPaused(prev => {
+          // Use functional update — we read panelOpen/selectionMode via refs below
+          return true
+        })
+      } else {
+        setPaused(false)
+      }
+    }
+    document.addEventListener('pointerlockchange', onPointerLockChange)
+    return () => document.removeEventListener('pointerlockchange', onPointerLockChange)
+  }, [])
+
+  const handleResume = useCallback(() => {
+    // Re-acquire pointer lock on the canvas
+    const canvas = document.querySelector('canvas')
+    if (canvas) canvas.requestPointerLock()
+  }, [])
 
   useEffect(() => {
     // Safety timeout: dismiss loading screen after 15s no matter what
@@ -1535,12 +1562,31 @@ function App() {
             </div>
             <div className="controls-guide-row">
               <kbd>Esc</kbd>
-              <span className="controls-guide-row-label">Show Mouse</span>
+              <span className="controls-guide-row-label">Pause</span>
             </div>
             <div className="controls-guide-divider" />
             <div className="controls-guide-row controls-guide-action">
               <kbd className="kbd-highlight">E</kbd>
               <span className="controls-guide-row-label">Open Creator</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {paused && !panelOpen && !selectionMode && !IS_MOBILE && (
+        <div className="pause-overlay" onClick={handleResume}>
+          <div className="pause-card">
+            <div className="pause-icon">❚❚</div>
+            <div className="pause-title">Paused</div>
+            <div className="pause-hint">Click anywhere to resume</div>
+            <div className="pause-controls">
+              <div className="pause-controls-row"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><span>Move</span></div>
+              <div className="pause-controls-row"><kbd>Mouse</kbd><span>Look</span></div>
+              <div className="pause-controls-row"><kbd>Hold Click</kbd><span>Edit Object</span></div>
+              <div className="pause-controls-row"><kbd>Shift</kbd><span>Sprint</span></div>
+              <div className="pause-controls-row"><kbd>Space</kbd><span>Jump</span></div>
+              <div className="pause-controls-row"><kbd>E</kbd><span>Image Creator</span></div>
+              <div className="pause-controls-row"><kbd>Esc</kbd><span>Pause</span></div>
             </div>
           </div>
         </div>
