@@ -804,7 +804,9 @@ function App() {
           <div className="scene-loading-rule" />
           <div className="scene-loading-title">Banana City</div>
           <div className="scene-loading-subtitle">Hank's Creative Artifact</div>
-          <div className="scene-loading-label">Loading...</div>
+          <div className="scene-loading-bar-container">
+            <div className={`scene-loading-bar${sceneLoadingFadeOut ? ' complete' : ''}`} />
+          </div>
         </div>
       </div>
       {sceneLoadingFadeOut && !hasInteracted && (
