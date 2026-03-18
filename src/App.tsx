@@ -186,6 +186,9 @@ function App() {
   const sceneObjectCount = useRef(0)
   const texturesLoadedCount = useRef(0)
 
+  // Click-to-start state (shown after loading, dismissed on first interaction)
+  const [hasInteracted, setHasInteracted] = useState(false)
+
   // Ref to get camera state from ThreeScene
   const getCameraStateRef = useRef<(() => { position: [number, number, number]; quaternion: [number, number, number, number] }) | null>(null)
 
@@ -251,6 +254,22 @@ function App() {
     }, 200)
     return () => clearInterval(interval)
   }, [debugMode])
+
+  // Dismiss "Click to start" on first pointer lock (desktop) or touch (mobile)
+  useEffect(() => {
+    if (hasInteracted) return
+    if (IS_MOBILE) {
+      const onTouch = () => setHasInteracted(true)
+      document.addEventListener('touchstart', onTouch, { once: true })
+      return () => document.removeEventListener('touchstart', onTouch)
+    } else {
+      const onLock = () => {
+        if (document.pointerLockElement) setHasInteracted(true)
+      }
+      document.addEventListener('pointerlockchange', onLock)
+      return () => document.removeEventListener('pointerlockchange', onLock)
+    }
+  }, [hasInteracted])
 
   useEffect(() => {
     // Safety timeout: dismiss loading screen after 15s no matter what
@@ -752,8 +771,16 @@ function App() {
           <div className="scene-loading-rule" />
           <div className="scene-loading-title">Banana City</div>
           <div className="scene-loading-subtitle">Hank's Creative Artifact</div>
+          <div className="scene-loading-label">Loading...</div>
         </div>
       </div>
+      {sceneLoadingFadeOut && !hasInteracted && (
+        <div className="click-to-start-overlay">
+          <div className="click-to-start-text">
+            {IS_MOBILE ? 'Tap to start' : 'Click to start'}
+          </div>
+        </div>
+      )}
       {!selectionMode && (
         <div className="crosshair-container">
           <div className="crosshair" />
@@ -1520,12 +1547,7 @@ function App() {
       )}
 
       {IS_MOBILE && !selectionMode && !panelOpen && activeDialog.length === 0 && (
-        <>
-          <VirtualJoystick moveRef={mobileMove} />
-          <button className="mobile-creator-btn" onClick={togglePanel}>
-            <span className="mobile-creator-btn-icon">+</span>
-          </button>
-        </>
+        <VirtualJoystick moveRef={mobileMove} />
       )}
     </>
   )

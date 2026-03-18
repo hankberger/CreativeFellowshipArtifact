@@ -1746,6 +1746,18 @@
   animation: sl-fade-up 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.65s forwards;
 }
 
+.scene-loading-label {
+  margin-top: 1.5rem;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.55rem;
+  font-weight: 400;
+  color: #7a756e;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  opacity: 0;
+  animation: sl-fade-up 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.9s forwards;
+}
+
 @keyframes sl-fade-up {
   from {
     opacity: 0;
@@ -1765,6 +1777,37 @@
   to {
     opacity: 1;
     transform: scaleX(1);
+  }
+}
+
+/* ─── Click to Start Overlay ─── */
+.click-to-start-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9998;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.click-to-start-text {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.85rem;
+  font-weight: 400;
+  color: #a8a39b;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  opacity: 0;
+  animation: cts-pulse 2.5s cubic-bezier(0.4, 0, 0.2, 1) 2s infinite;
+}
+
+@keyframes cts-pulse {
+  0%, 100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 1;
   }
 }
 

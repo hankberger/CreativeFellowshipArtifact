@@ -1285,6 +1285,10 @@ export default function ThreeScene({
         fadeDistance={60}
         infiniteGrid
       />
+      <mesh position={[-82, 3, 38]}>
+        <sphereGeometry args={[1, 32, 32]} />
+        <meshStandardMaterial color="#ffffff" />
+      </mesh>
     </Canvas>
   )
 }
