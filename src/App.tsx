@@ -280,10 +280,7 @@ function App() {
     const onPointerLockChange = () => {
       if (!document.pointerLockElement) {
         // Only pause if we're in normal gameplay (not panel/selection open)
-        setPaused(prev => {
-          // Use functional update — we read panelOpen/selectionMode via refs below
-          return true
-        })
+        setPaused(true)
       } else {
         setPaused(false)
       }
