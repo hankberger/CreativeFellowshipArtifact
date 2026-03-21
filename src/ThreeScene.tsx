@@ -33,6 +33,9 @@ function FirstPersonMovement({ disabled, mobileMove }: { disabled: boolean; mobi
   const raycaster = useRef(new THREE.Raycaster())
   const velocityY = useRef(0)
   const isGrounded = useRef(true)
+  const _feetPos = useRef(new THREE.Vector3())
+  const _downDir = useRef(new THREE.Vector3(0, -1, 0))
+  const _collidablesCache = useRef<{ frame: number; meshes: THREE.Mesh[] }>({ frame: -1, meshes: [] })
 
   const onKeyDown = useCallback((e: KeyboardEvent) => {
     keys.current[e.code] = true
@@ -51,8 +54,11 @@ function FirstPersonMovement({ disabled, mobileMove }: { disabled: boolean; mobi
     }
   }, [onKeyDown, onKeyUp])
 
-  // Collect all meshes belonging to image planes
+  // Collect all meshes belonging to image planes (cached per frame)
+  const frameCount = useRef(0)
   const getCollidables = useCallback(() => {
+    const frame = frameCount.current
+    if (_collidablesCache.current.frame === frame) return _collidablesCache.current.meshes
     const meshes: THREE.Mesh[] = []
     scene.traverse((obj) => {
       let parent: THREE.Object3D | null = obj
@@ -64,6 +70,7 @@ function FirstPersonMovement({ disabled, mobileMove }: { disabled: boolean; mobi
         parent = parent.parent
       }
     })
+    _collidablesCache.current = { frame, meshes }
     return meshes
   }, [scene])
 
@@ -93,6 +100,7 @@ function FirstPersonMovement({ disabled, mobileMove }: { disabled: boolean; mobi
   }, [getCollidables])
 
   useFrame((_, delta) => {
+    frameCount.current++
     if (disabled) return
 
     const forward = new THREE.Vector3()
@@ -156,9 +164,8 @@ function FirstPersonMovement({ disabled, mobileMove }: { disabled: boolean; mobi
     camera.position.y += velocityY.current * delta
 
     // Downward raycast to find surfaces below the player
-    const feetPos = new THREE.Vector3(camera.position.x, camera.position.y, camera.position.z)
-    const downDir = new THREE.Vector3(0, -1, 0)
-    raycaster.current.set(feetPos, downDir)
+    _feetPos.current.set(camera.position.x, camera.position.y, camera.position.z)
+    raycaster.current.set(_feetPos.current, _downDir.current)
     raycaster.current.far = PLAYER_HEIGHT + 2 // check below feet plus some margin
     const collidables = getCollidables()
     const downHits = raycaster.current.intersectObjects(collidables, false)
@@ -297,11 +304,14 @@ function ImagePlane({
 }) {
   const groupRef = useRef<THREE.Group>(null!)
   const chatBubbleRef = useRef<THREE.Group>(null!)
+  const meshRef = useRef<THREE.Mesh>(null!)
   const { camera } = useThree()
+  const _billboardCamPos = useRef(new THREE.Vector3())
+  const _bubbleWorldPos = useRef(new THREE.Vector3())
   const [texture, setTexture] = useState<THREE.Texture | null>(null)
   const [chatBubbleTexture, setChatBubbleTexture] = useState<THREE.Texture | null>(null)
   const [speakingTexture, setSpeakingTexture] = useState<THREE.Texture | null>(null)
-  const [showSpeakingFrame, setShowSpeakingFrame] = useState(false)
+  const showSpeakingFrameRef = useRef(false)
   const [planeSize, setPlaneSize] = useState<[number, number]>([2, 2])
   const initialized = useRef(false)
   const speakingImageUrlRef = useRef(speakingImageUrl)
@@ -362,18 +372,6 @@ function ImagePlane({
       setSpeakingTexture(tex)
     })
   }, [speakingImageUrl])
-
-  // Flash between normal and speaking texture every 50ms when speaking
-  useEffect(() => {
-    if (!isSpeaking || !speakingTexture) {
-      setShowSpeakingFrame(false)
-      return
-    }
-    const interval = setInterval(() => {
-      setShowSpeakingFrame(prev => !prev)
-    }, 100)
-    return () => clearInterval(interval)
-  }, [isSpeaking, speakingTexture])
 
   useEffect(() => {
     const loader = new THREE.TextureLoader()
@@ -467,20 +465,30 @@ function ImagePlane({
     }
   }, [texture, camera, savedPosition, savedRotation, savedScale, id, onTransformUpdate])
 
-  // Billboard: always face the camera
+  // Billboard, chatbubble, and speaking texture swap — all in one useFrame
   useFrame(() => {
     if (billboard && groupRef.current && !selected) {
-      const camPos = camera.position.clone()
-      camPos.y = groupRef.current.position.y
-      groupRef.current.lookAt(camPos)
+      _billboardCamPos.current.set(camera.position.x, groupRef.current.position.y, camera.position.z)
+      groupRef.current.lookAt(_billboardCamPos.current)
     }
     // Chatbubble always faces camera and bobs up/down
     if (character && chatBubbleRef.current) {
-      const camPos = camera.position.clone()
-      camPos.y = chatBubbleRef.current.getWorldPosition(new THREE.Vector3()).y
-      chatBubbleRef.current.lookAt(camPos)
+      chatBubbleRef.current.getWorldPosition(_bubbleWorldPos.current)
+      _billboardCamPos.current.set(camera.position.x, _bubbleWorldPos.current.y, camera.position.z)
+      chatBubbleRef.current.lookAt(_billboardCamPos.current)
       const baseY = planeSize[1] / 2 + 0.3
       chatBubbleRef.current.position.y = baseY + Math.sin(performance.now() * 0.0015) * 0.04
+    }
+    // Swap speaking texture directly on the material (no React re-render)
+    if (meshRef.current) {
+      const mat = meshRef.current.material as THREE.MeshStandardMaterial
+      if (isSpeaking && speakingTexture && texture) {
+        const show = Math.floor(performance.now() / 100) % 2 === 0
+        const target = show ? speakingTexture : texture
+        if (mat.map !== target) mat.map = target
+      } else if (mat.map !== texture && texture) {
+        mat.map = texture
+      }
     }
   })
 
@@ -488,9 +496,9 @@ function ImagePlane({
     <group ref={groupRef} userData={{ imageId: id }} position={savedPosition || [0, 0, 0]}>
       {texture && (
         <>
-          <mesh>
+          <mesh ref={meshRef}>
             <planeGeometry args={planeSize} />
-            <meshStandardMaterial map={showSpeakingFrame && speakingTexture ? speakingTexture : texture} transparent alphaTest={0.5} side={THREE.DoubleSide} />
+            <meshStandardMaterial map={texture} alphaTest={0.5} side={THREE.DoubleSide} />
           </mesh>
           {selected && (
             <mesh position={[0, 0, -0.01]}>
@@ -932,6 +940,7 @@ function ProximityDetector({
   const prevDisabledRef = useRef(disabled)
   const onCharacterProximityRef = useRef(onCharacterProximity)
   onCharacterProximityRef.current = onCharacterProximity
+  const _objPos = useRef(new THREE.Vector3())
 
   useFrame(() => {
     // When transitioning from disabled (dialog active) back to enabled,
@@ -952,10 +961,9 @@ function ProximityDetector({
       const cooldownId = cooldownCharRef.current
       scene.traverse((obj) => {
         if (obj.userData.imageId === cooldownId) {
-          const objPos = new THREE.Vector3()
-          obj.getWorldPosition(objPos)
-          const dx = playerPos.x - objPos.x
-          const dz = playerPos.z - objPos.z
+          obj.getWorldPosition(_objPos.current)
+          const dx = playerPos.x - _objPos.current.x
+          const dz = playerPos.z - _objPos.current.z
           const dist = Math.sqrt(dx * dx + dz * dz)
           const exitRadius = (characterRadii.get(cooldownId) ?? 5) * EXIT_RADIUS_MULTIPLIER
           if (dist <= exitRadius) stillInExit = true
@@ -972,17 +980,17 @@ function ProximityDetector({
     // Check distance to each character (entry radius)
     for (const img of acceptedImages) {
       if (!characterIds.has(img.id)) continue
-      let objPos: THREE.Vector3 | null = null
+      let found = false
       scene.traverse((obj) => {
         if (obj.userData.imageId === img.id) {
-          objPos = new THREE.Vector3()
-          obj.getWorldPosition(objPos)
+          obj.getWorldPosition(_objPos.current)
+          found = true
         }
       })
-      if (!objPos) continue
+      if (!found) continue
 
-      const dx = playerPos.x - (objPos as THREE.Vector3).x
-      const dz = playerPos.z - (objPos as THREE.Vector3).z
+      const dx = playerPos.x - _objPos.current.x
+      const dz = playerPos.z - _objPos.current.z
       const dist = Math.sqrt(dx * dx + dz * dz)
       const radius = characterRadii.get(img.id) ?? 5
 
@@ -1229,7 +1237,7 @@ export default function ThreeScene({
 }: ThreeSceneProps) {
   return (
     <Canvas
-      camera={{ position: [0, PLAYER_HEIGHT, 5], fov: 60, rotation: [-0.15, 0, 0] }}
+      camera={{ position: [0, PLAYER_HEIGHT, 25], fov: 60, rotation: [-0.15, 0, 0] }}
       style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', zIndex: 0 }}
     >
       <Environment files="/sky.hdr" background environmentIntensity={0.08} backgroundIntensity={0.25} />
