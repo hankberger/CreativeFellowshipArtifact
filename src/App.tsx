@@ -8,9 +8,9 @@ interface DialogTextHandle {
 }
 
 function DialogText({ text, handleRef, onStreamingChange }: { text: string; handleRef: React.MutableRefObject<DialogTextHandle | null>; onStreamingChange?: (streaming: boolean) => void }) {
-  const spaceIdx = text.indexOf(' ')
-  const firstWord = spaceIdx === -1 ? text : text.slice(0, spaceIdx)
-  const rest = spaceIdx === -1 ? '' : text.slice(spaceIdx)
+  const colonIdx = text.indexOf(':')
+  const firstWord = colonIdx === -1 ? '' : text.slice(0, colonIdx + 1)
+  const rest = colonIdx === -1 ? text : text.slice(colonIdx + 1)
   const [charCount, setCharCount] = useState(0)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
