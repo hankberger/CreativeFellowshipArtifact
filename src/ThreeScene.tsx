@@ -1245,7 +1245,7 @@ export default function ThreeScene({
 }: ThreeSceneProps) {
   return (
     <Canvas
-      camera={{ position: [0, PLAYER_HEIGHT, 25], fov: 60, rotation: [0.35, 0, 0] }}
+      camera={{ position: [0, PLAYER_HEIGHT, 25], fov: 60, rotation: [0.2, 0, 0] }}
       style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', zIndex: 0 }}
     >
       <Environment files="/sky.hdr" background environmentIntensity={0.08} backgroundIntensity={0.25} />
