@@ -1136,7 +1136,7 @@ function RotatingBanana({ position }: { position: [number, number, number] }) {
   })
   return (
     <group ref={groupRef} position={position}>
-      <primitive object={fbx} scale={0.005} />
+      <primitive object={fbx} scale={0.01} />
     </group>
   )
 }
