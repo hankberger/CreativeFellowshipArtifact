@@ -19,7 +19,7 @@ interface AcceptedImage {
   scale?: [number, number, number];
 }
 
-const MOVE_SPEED = 8
+const MOVE_SPEED = 12
 const SPRINT_MULTIPLIER = 1.5625
 const PLAYER_HEIGHT = 2
 const COLLISION_DISTANCE = 0.6
