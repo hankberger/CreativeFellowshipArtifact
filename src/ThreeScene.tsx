@@ -6,6 +6,7 @@ import {
   TransformControls as DreiTransformControls,
   Grid,
   Environment,
+  useFBX,
 } from '@react-three/drei'
 import * as THREE from 'three'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
@@ -1109,17 +1110,17 @@ function DialogCameraController({ target, dialogActive }: {
   return null
 }
 
-function RotatingCube({ position }: { position: [number, number, number] }) {
-  const meshRef = useRef<THREE.Mesh>(null!)
+function RotatingBanana({ position }: { position: [number, number, number] }) {
+  const fbx = useFBX('/banana.fbx')
+  const groupRef = useRef<THREE.Group>(null!)
   useFrame((_, delta) => {
-    meshRef.current.rotation.x += delta * 0.3
-    meshRef.current.rotation.y += delta * 0.5
+    groupRef.current.rotation.x += delta * 0.3
+    groupRef.current.rotation.y += delta * 0.5
   })
   return (
-    <mesh ref={meshRef} position={position}>
-      <boxGeometry args={[2.5, 2.5, 2.5]} />
-      <meshStandardMaterial color="#ffffff" />
-    </mesh>
+    <group ref={groupRef} position={position}>
+      <primitive object={fbx} scale={0.05} />
+    </group>
   )
 }
 
@@ -1237,7 +1238,7 @@ export default function ThreeScene({
 }: ThreeSceneProps) {
   return (
     <Canvas
-      camera={{ position: [0, PLAYER_HEIGHT, 25], fov: 60, rotation: [-0.15, 0, 0] }}
+      camera={{ position: [0, PLAYER_HEIGHT, 25], fov: 60, rotation: [-0.35, 0, 0] }}
       style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', zIndex: 0 }}
     >
       <Environment files="/sky.hdr" background environmentIntensity={0.08} backgroundIntensity={0.25} />
@@ -1307,7 +1308,7 @@ export default function ThreeScene({
         fadeDistance={60}
         infiniteGrid
       />
-      <RotatingCube position={[-82, 2, 38]} />
+      <RotatingBanana position={[-82, 2, 38]} />
     </Canvas>
   )
 }
