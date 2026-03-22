@@ -1115,13 +1115,23 @@ function RotatingBanana({ position }: { position: [number, number, number] }) {
   const groupRef = useRef<THREE.Group>(null!)
   const { gl, scene, camera } = useThree()
 
-  // Pre-compile shaders to avoid jank when banana first enters view
+  // Force a warm-up render so shaders, geometry, and textures are uploaded to the GPU upfront
+  // This avoids the jank/stutter when the banana first enters the camera view
   useEffect(() => {
-    gl.compile(scene, camera)
-  }, [fbx, gl, scene, camera])
+    const tempScene = new THREE.Scene()
+    const clone = fbx.clone(true)
+    tempScene.add(clone)
+    tempScene.add(new THREE.AmbientLight(0xffffff))
+    gl.compile(tempScene, camera)
+    const oldAutoClear = gl.autoClear
+    gl.autoClear = false
+    gl.render(tempScene, camera)
+    gl.autoClear = oldAutoClear
+    gl.clear()
+    tempScene.remove(clone)
+  }, [fbx, gl, camera])
 
   useFrame((_, delta) => {
-    groupRef.current.rotation.x += delta * 0.3
     groupRef.current.rotation.y += delta * 0.5
   })
   return (
@@ -1315,7 +1325,7 @@ export default function ThreeScene({
         fadeDistance={60}
         infiniteGrid
       />
-      <RotatingBanana position={[-82, 2, 38]} />
+      <RotatingBanana position={[-82, 1, 38]} />
     </Canvas>
   )
 }
