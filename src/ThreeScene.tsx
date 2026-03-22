@@ -336,6 +336,7 @@ function ImagePlane({
     speakingImageUrlRef.current = speakingImageUrl
     const loader = new THREE.TextureLoader()
     loader.load(speakingImageUrl, (tex) => {
+      tex.colorSpace = THREE.SRGBColorSpace
       // Analyze and crop like the main texture
       const image = tex.image as HTMLImageElement
       const canvas = document.createElement('canvas')
