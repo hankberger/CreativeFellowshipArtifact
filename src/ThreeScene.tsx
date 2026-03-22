@@ -1250,7 +1250,7 @@ export default function ThreeScene({
       <CameraStateExposer getCameraStateRef={getCameraStateRef} />
       {debugRef && <DebugInfoUpdater debugRef={debugRef} />}
       <DialogCameraController target={dialogCameraTarget} dialogActive={dialogActive} />
-      <HoldToSelect disabled={selectionMode || dialogActive || !!isMobile} onHoldStart={onHoldStart} onHoldEnd={onHoldEnd} />
+      <HoldToSelect disabled={selectionMode || dialogActive || panelOpen || !!isMobile} onHoldStart={onHoldStart} onHoldEnd={onHoldEnd} />
       {isMobile && onMobileTapSelect && (
         <MobileTapSelect disabled={selectionMode || dialogActive || panelOpen} onSelect={onMobileTapSelect} />
       )}
