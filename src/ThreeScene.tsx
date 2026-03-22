@@ -311,7 +311,6 @@ function ImagePlane({
   const [texture, setTexture] = useState<THREE.Texture | null>(null)
   const [chatBubbleTexture, setChatBubbleTexture] = useState<THREE.Texture | null>(null)
   const [speakingTexture, setSpeakingTexture] = useState<THREE.Texture | null>(null)
-  const showSpeakingFrameRef = useRef(false)
   const [planeSize, setPlaneSize] = useState<[number, number]>([2, 2])
   const initialized = useRef(false)
   const speakingImageUrlRef = useRef(speakingImageUrl)
