@@ -1113,7 +1113,7 @@ function DialogCameraController({ target, dialogActive }: {
 function RotatingBanana({ position }: { position: [number, number, number] }) {
   const fbx = useFBX('/banana.fbx')
   const groupRef = useRef<THREE.Group>(null!)
-  const { gl, scene, camera } = useThree()
+  const { gl, camera } = useThree()
 
   // Force a warm-up render so shaders, geometry, and textures are uploaded to the GPU upfront
   // This avoids the jank/stutter when the banana first enters the camera view
