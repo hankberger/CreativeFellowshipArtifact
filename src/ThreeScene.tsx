@@ -1113,13 +1113,20 @@ function DialogCameraController({ target, dialogActive }: {
 function RotatingBanana({ position }: { position: [number, number, number] }) {
   const fbx = useFBX('/banana.fbx')
   const groupRef = useRef<THREE.Group>(null!)
+  const { gl, scene, camera } = useThree()
+
+  // Pre-compile shaders to avoid jank when banana first enters view
+  useEffect(() => {
+    gl.compile(scene, camera)
+  }, [fbx, gl, scene, camera])
+
   useFrame((_, delta) => {
     groupRef.current.rotation.x += delta * 0.3
     groupRef.current.rotation.y += delta * 0.5
   })
   return (
     <group ref={groupRef} position={position}>
-      <primitive object={fbx} scale={0.0005} />
+      <primitive object={fbx} scale={0.005} />
     </group>
   )
 }
