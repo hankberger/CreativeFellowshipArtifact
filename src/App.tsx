@@ -666,6 +666,7 @@ function App() {
   const activeDialogCharIdRef = useRef<number | null>(null)
   const dialogTextRef = useRef<DialogTextHandle | null>(null)
   const activeDialogRef = useRef<DialogEntry[]>([])
+  const dialogEndAudioRef = useRef<HTMLAudioElement | null>(null)
   const [dialogStreaming, setDialogStreaming] = useState(false)
 
   const handleCharacterProximity = useCallback(async (characterId: number | null) => {
@@ -677,6 +678,11 @@ function App() {
       setActiveDialogIndex(0)
       setActiveDialogCharId(null)
       return
+    }
+    // Stop any playing end-dialog sound
+    if (dialogEndAudioRef.current) {
+      dialogEndAudioRef.current.pause()
+      dialogEndAudioRef.current = null
     }
     // Already showing dialog for this character
     if (characterId === activeDialogCharIdRef.current) return
@@ -712,6 +718,9 @@ function App() {
           const sound = dialogEndSounds.get(charId)
           if (sound) {
             const audio = new Audio(`/${sound}`)
+            audio.volume = 0.2
+            audio.addEventListener('ended', () => { dialogEndAudioRef.current = null })
+            dialogEndAudioRef.current = audio
             audio.play().catch(() => {})
           }
         }
