@@ -71,6 +71,7 @@ interface AcceptedImage {
   character?: boolean;
   radius?: number;
   speakingImageId?: string | null;
+  dialogEndSound?: string | null;
 }
 
 const HOLD_DURATION = 2000
@@ -149,7 +150,7 @@ function VirtualJoystick({ moveRef }: { moveRef: React.MutableRefObject<{ x: num
 }
 
 function App() {
-  const [prompt, setPrompt] = useState('A cathedral made entirely of ice, with colored light refracting through its translucent walls')
+  const [prompt, setPrompt] = useState('Grafiti of a banana')
   const [useMagentaScreen, setUseMagentaScreen] = useState(false)
   const [imageUrl, setImageUrl] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -171,6 +172,8 @@ function App() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [characterRadii, setCharacterRadii] = useState<Map<number, number>>(new Map())
   const [speakingImageIds, setSpeakingImageIds] = useState<Map<number, string>>(new Map())
+  const [dialogEndSounds, setDialogEndSounds] = useState<Map<number, string>>(new Map())
+  const [availableSounds, setAvailableSounds] = useState<string[]>([])
   const [speakingGalleryOpen, setSpeakingGalleryOpen] = useState(false)
   const [speakingGallerySearch, setSpeakingGallerySearch] = useState('')
   const [swapGalleryOpen, setSwapGalleryOpen] = useState(false)
@@ -321,6 +324,9 @@ function App() {
           const speaking = new Map<number, string>()
           data.forEach((d: AcceptedImage) => { if (d.speakingImageId) speaking.set(d.id, d.speakingImageId) })
           setSpeakingImageIds(speaking)
+          const endSounds = new Map<number, string>()
+          data.forEach((d: AcceptedImage) => { if (d.dialogEndSound) endSounds.set(d.id, d.dialogEndSound) })
+          setDialogEndSounds(endSounds)
         } else {
           setSceneLoadingFadeOut(true)
         }
@@ -331,6 +337,10 @@ function App() {
     })()
 
     return () => clearTimeout(safetyTimeout)
+  }, [])
+
+  useEffect(() => {
+    fetch('/api/sounds').then(r => r.ok ? r.json() : []).then(setAvailableSounds).catch(() => {})
   }, [])
 
   const handleAccept = async () => {
@@ -472,6 +482,7 @@ function App() {
               character: characterIds.has(id),
               radius: characterRadii.get(id) ?? 5,
               speakingImageId: speakingImageIds.get(id) ?? null,
+              dialogEndSound: dialogEndSounds.get(id) ?? null,
             }),
           })
         } catch (err) {
@@ -489,7 +500,7 @@ function App() {
     setAcceptedImages(prev => prev.map(img => {
       const t = latestTransforms.current.get(img.id)
       if (idsToSave.includes(img.id) && t) {
-        return { ...img, position: t.position, rotation: t.rotation, scale: t.scale, billboard: billboardIds.has(img.id), character: characterIds.has(img.id), radius: characterRadii.get(img.id) ?? 5, speakingImageId: speakingImageIds.get(img.id) ?? null }
+        return { ...img, position: t.position, rotation: t.rotation, scale: t.scale, billboard: billboardIds.has(img.id), character: characterIds.has(img.id), radius: characterRadii.get(img.id) ?? 5, speakingImageId: speakingImageIds.get(img.id) ?? null, dialogEndSound: dialogEndSounds.get(img.id) ?? null }
       }
       return img
     }))
@@ -508,7 +519,7 @@ function App() {
       const canvas = document.querySelector('canvas')
       if (canvas) canvas.requestPointerLock()
     })
-  }, [selectedImageId, selectedImageIds, multiSelectMode, acceptedImages, billboardIds, characterIds, characterRadii, speakingImageIds, dialogEntries, saveDialog])
+  }, [selectedImageId, selectedImageIds, multiSelectMode, acceptedImages, billboardIds, characterIds, characterRadii, speakingImageIds, dialogEndSounds, dialogEntries, saveDialog])
 
   const handleDuplicateObject = useCallback(async () => {
     const idsToDuplicate = multiSelectMode && selectedImageIds.size > 0
@@ -532,6 +543,7 @@ function App() {
               character: characterIds.has(id),
               radius: characterRadii.get(id) ?? 5,
               speakingImageId: speakingImageIds.get(id) ?? null,
+              dialogEndSound: dialogEndSounds.get(id) ?? null,
             }),
           })
         }
@@ -599,7 +611,7 @@ function App() {
     } catch (err) {
       console.error('Failed to duplicate object', err)
     }
-  }, [selectedImageId, selectedImageIds, multiSelectMode, acceptedImages, billboardIds, characterIds, characterRadii, speakingImageIds, dialogEntries, saveDialog])
+  }, [selectedImageId, selectedImageIds, multiSelectMode, acceptedImages, billboardIds, characterIds, characterRadii, speakingImageIds, dialogEndSounds, dialogEntries, saveDialog])
 
   const handleRemoveObject = useCallback(async () => {
     const idsToRemove = multiSelectMode && selectedImageIds.size > 0
@@ -694,7 +706,15 @@ function App() {
       if (prev < activeDialogRef.current.length - 1) {
         return prev + 1
       } else {
-        // End of dialog
+        // End of dialog — play end sound if configured
+        const charId = activeDialogCharIdRef.current
+        if (charId != null) {
+          const sound = dialogEndSounds.get(charId)
+          if (sound) {
+            const audio = new Audio(`/${sound}`)
+            audio.play().catch(() => {})
+          }
+        }
         activeDialogRef.current = []
         activeDialogCharIdRef.current = null
         setActiveDialog([])
@@ -702,7 +722,7 @@ function App() {
         return 0
       }
     })
-  }, [])
+  }, [dialogEndSounds])
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -930,7 +950,7 @@ function App() {
             <textarea
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
-              placeholder="A cartoon man with a tophat and a moustache"
+              placeholder="Grafiti of a banana"
               rows={4}
             />
             <div className="prompt-char-count">{prompt.length} chars</div>
@@ -1444,6 +1464,28 @@ function App() {
                   Save Dialog
                 </button>
               </div>
+            </div>
+          )}
+          {selectedImageId != null && characterIds.has(selectedImageId) && (
+            <div className="dialog-end-sound">
+              <label className="dialog-editor-title">End Sound</label>
+              <select
+                value={dialogEndSounds.get(selectedImageId) ?? ''}
+                onChange={(e) => {
+                  const val = e.target.value
+                  setDialogEndSounds(prev => {
+                    const next = new Map(prev)
+                    if (val) next.set(selectedImageId!, val)
+                    else next.delete(selectedImageId!)
+                    return next
+                  })
+                }}
+              >
+                <option value="">None</option>
+                {availableSounds.map(s => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
             </div>
           )}
           {speakingGalleryOpen && selectedImageId != null && characterIds.has(selectedImageId) && (

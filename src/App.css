@@ -1478,6 +1478,25 @@
   gap: 0.35rem;
 }
 
+.dialog-end-sound {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0;
+}
+
+.dialog-end-sound select {
+  flex: 1;
+  background: var(--forge-surface);
+  border: 1px solid var(--forge-border);
+  color: var(--forge-text-dim);
+  padding: 0.3rem 0.5rem;
+  border-radius: 2px;
+  font-family: 'Syne', sans-serif;
+  font-size: 0.7rem;
+  cursor: pointer;
+}
+
 .dialog-add-btn,
 .dialog-save-btn {
   flex: 1;

@@ -75,6 +75,11 @@ let db: any;
     await db.exec("ALTER TABLE scene_objects ADD COLUMN speaking_image_id TEXT DEFAULT NULL");
   }
 
+  // Migration: add dialog_end_sound column if missing
+  if (!cols.some((c: any) => c.name === 'dialog_end_sound')) {
+    await db.exec("ALTER TABLE scene_objects ADD COLUMN dialog_end_sound TEXT DEFAULT NULL");
+  }
+
   // Create character_dialog table
   await db.exec(`CREATE TABLE IF NOT EXISTS character_dialog (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -120,6 +125,21 @@ app.use(express.static(path.join(projectRoot, "dist")));
 app.use("/images", express.static(path.join(projectRoot, "data", "images")));
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+
+// List available .mp3 files from the public/ (dist/) folder
+app.get("/api/sounds", async (req: Request, res: Response) => {
+  try {
+    const distDir = path.join(projectRoot, "dist");
+    const publicDir = path.join(projectRoot, "public");
+    // Check dist first (production), fall back to public (dev)
+    const dir = fs.existsSync(distDir) ? distDir : publicDir;
+    const files = fs.readdirSync(dir).filter(f => f.toLowerCase().endsWith('.mp3'));
+    res.json(files);
+  } catch (error) {
+    console.error("Error listing sounds:", error);
+    res.json([]);
+  }
+});
 
 app.get("/api/images", async (req: Request, res: Response) => {
   try {
@@ -250,7 +270,7 @@ app.post(
 app.get("/api/scene-objects", async (req: Request, res: Response) => {
   try {
     const rows = await db.all(
-      "SELECT id, image_id, position_x, position_y, position_z, rotation_x, rotation_y, rotation_z, scale_x, scale_y, scale_z, billboard, character, radius, speaking_image_id FROM scene_objects ORDER BY created_at ASC",
+      "SELECT id, image_id, position_x, position_y, position_z, rotation_x, rotation_y, rotation_z, scale_x, scale_y, scale_z, billboard, character, radius, speaking_image_id, dialog_end_sound FROM scene_objects ORDER BY created_at ASC",
     );
     const objects = rows.map((r: any) => ({
       id: r.id,
@@ -263,6 +283,7 @@ app.get("/api/scene-objects", async (req: Request, res: Response) => {
       character: !!r.character,
       radius: r.radius ?? 5,
       speakingImageId: r.speaking_image_id || null,
+      dialogEndSound: r.dialog_end_sound || null,
     }));
     res.json(objects);
   } catch (error) {
@@ -305,6 +326,7 @@ app.put(
         character,
         radius,
         speakingImageId,
+        dialogEndSound,
       } = req.body;
       await db.run(
         `UPDATE scene_objects SET
@@ -315,9 +337,10 @@ app.put(
           billboard = ?,
           character = ?,
           radius = ?,
-          speaking_image_id = ?
+          speaking_image_id = ?,
+          dialog_end_sound = ?
         WHERE id = ?`,
-        [imageId ?? null, positionX, positionY, positionZ, rotationX, rotationY, rotationZ, scaleX, scaleY, scaleZ, billboard ? 1 : 0, character ? 1 : 0, radius ?? 5, speakingImageId ?? null, id],
+        [imageId ?? null, positionX, positionY, positionZ, rotationX, rotationY, rotationZ, scaleX, scaleY, scaleZ, billboard ? 1 : 0, character ? 1 : 0, radius ?? 5, speakingImageId ?? null, dialogEndSound ?? null, id],
       );
       res.json({ ok: true });
     } catch (error) {
