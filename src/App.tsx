@@ -815,16 +815,29 @@ function App() {
         refImagesBase64.push({ mimeType: ref.file.type, data: base64 })
       }
 
+      // Generation is gated server-side. Mint a short-lived, single-use token
+      // from the page itself — the endpoint rejects requests without one.
+      const tokenRes = await fetch('/api/generation-token', { method: 'POST' })
+      if (!tokenRes.ok) {
+        const detail = await tokenRes.json().catch(() => null)
+        throw new Error(detail?.error || 'Could not start generation. Reload the page and try again.')
+      }
+      const { token } = await tokenRes.json()
+
       const response = await fetch('/api/generate-image', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'X-Generation-Token': token,
         },
         body: JSON.stringify({ prompt, referenceImages: refImagesBase64, useMagentaScreen }),
       })
 
       if (!response.ok) {
-        throw new Error('Failed to generate image')
+        // Surface the server's reason — rate limits and rejected origins both
+        // land here and are worth showing verbatim.
+        const detail = await response.json().catch(() => null)
+        throw new Error(detail?.error || 'Failed to generate image')
       }
 
       const data = await response.json()
@@ -850,12 +863,49 @@ function App() {
     <>
       <div className={`scene-loading-overlay${sceneLoadingFadeOut ? ' fade-out' : ''}`}>
         <div className="scene-loading-content">
-          <img src="/images/9092c16a-dbe1-44a3-a903-4dd9f714da86.webp" alt="" className="scene-loading-logo" />
+          <img src="/banana.webp" alt="" className="scene-loading-logo" />
+          <div className="scene-loading-title">Banana City</div>
+          <div className="scene-loading-subtitle">A shared world built out of prompts</div>
           <div className="scene-loading-bar-container">
             <div className={`scene-loading-bar${sceneLoadingFadeOut ? ' complete' : ''}`} />
           </div>
-          <div className="scene-loading-title">Banana City</div>
-          <div className="scene-loading-subtitle">Hank's Creative Artifact</div>
+          <p className="scene-loading-blurb">
+            Nothing here was modeled by hand. Every object standing in this city
+            was described in a sentence by someone who wandered through before you,
+            then left behind where they dropped it.
+          </p>
+          {IS_MOBILE ? (
+            <div className="scene-loading-steps">
+              <div className="scene-loading-step">
+                <span className="scene-loading-step-num">01</span>
+                <span>Drag the joystick to walk, swipe to look around</span>
+              </div>
+              <div className="scene-loading-step">
+                <span className="scene-loading-step-num">02</span>
+                <span>Walk up to the residents &mdash; some of them talk</span>
+              </div>
+              <div className="scene-loading-step">
+                <span className="scene-loading-step-num">03</span>
+                <span>Visit on a desktop to add something of your own</span>
+              </div>
+            </div>
+          ) : (
+            <div className="scene-loading-steps">
+              <div className="scene-loading-step">
+                <span className="scene-loading-step-num">01</span>
+                <span>Press <kbd>E</kbd> and describe anything you want to exist</span>
+              </div>
+              <div className="scene-loading-step">
+                <span className="scene-loading-step-num">02</span>
+                <span>Place it wherever it belongs in the city</span>
+              </div>
+              <div className="scene-loading-step">
+                <span className="scene-loading-step-num">03</span>
+                <span>It stays &mdash; for everyone who arrives after you</span>
+              </div>
+            </div>
+          )}
+          <div className="scene-loading-footer">Hank Berger</div>
         </div>
       </div>
       {sceneLoadingFadeOut && !hasInteracted && (
@@ -1655,8 +1705,20 @@ function App() {
       {paused && !panelOpen && !selectionMode && !IS_MOBILE && (
         <div className="pause-overlay" onClick={handleResume}>
           <div className="pause-card">
+            <div className="pause-about">
+              <div className="pause-about-title">Banana City</div>
+              <p className="pause-about-text">
+                A shared world built out of prompts. Everything here was described
+                in a sentence by a visitor, generated on the spot, and left standing
+                where they dropped it.
+              </p>
+              <p className="pause-about-text pause-about-cta">
+                Press <kbd>E</kbd> to add yours. It stays for whoever arrives next.
+              </p>
+            </div>
+            <div className="pause-divider" />
             <div className="pause-social-links" onClick={e => e.stopPropagation()}>
-              <a href="https://github.com/hankberger/CreativeFellowshipArtifact/" target="_blank" rel="noopener noreferrer" className="pause-social-link" title="GitHub">
+              <a href="https://github.com/hankberger/banana-city" target="_blank" rel="noopener noreferrer" className="pause-social-link" title="GitHub">
                 <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
               </a>
               <a href="https://www.linkedin.com/in/hankberger/" target="_blank" rel="noopener noreferrer" className="pause-social-link" title="LinkedIn">

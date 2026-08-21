@@ -1,10 +1,11 @@
 import "dotenv/config";
-import express, { Request, Response } from "express";
+import express, { NextFunction, Request, Response } from "express";
 import path from "path";
 import { fileURLToPath } from "url";
 import { GoogleGenAI } from "@google/genai";
 import { v4 as uuidv4 } from "uuid";
 import * as fs from "fs";
+import crypto from "crypto";
 import sqlite3 from "sqlite3";
 import { open } from "sqlite";
 import sharp from "sharp";
@@ -119,6 +120,20 @@ let db: any;
 const app = express();
 const port = process.env.PORT || 3000;
 
+// Trust X-Forwarded-For only when the connection itself came from a loopback or
+// private address — which is exactly how a reverse proxy (Fly, Render, nginx)
+// reaches the app. A client connecting straight from the public internet is not
+// trusted, so the header can't be forged past the rate limiter. This means the
+// rate limit sees real client IPs on a normal deploy with nothing to configure.
+app.set(
+  "trust proxy",
+  process.env.TRUST_PROXY
+    ? /^\d+$/.test(process.env.TRUST_PROXY)
+      ? Number(process.env.TRUST_PROXY)
+      : process.env.TRUST_PROXY
+    : "uniquelocal",
+);
+
 app.use(express.json({ limit: '50mb' }));
 // When compiled, this file will be in dist-server/, so we go up one directory to find dist/
 app.use(express.static(path.join(projectRoot, "dist")));
@@ -153,8 +168,248 @@ app.get("/api/images", async (req: Request, res: Response) => {
   }
 });
 
+/* ═══════════════════════════════════════════════════════════════
+   Abuse protection for the generation endpoint
+
+   Generation is the only route that costs money, so it sits behind three
+   cheap checks. This cannot stop a headless *browser* driving the real
+   page — nothing can, since the page is public — but it does close the
+   easy doors: curl straight at the endpoint, calls from another site, and
+   bulk generation from one host.
+   ═══════════════════════════════════════════════════════════════ */
+
+// Signing key for generation tokens. Generated once and kept next to the
+// database, so it survives restarts and redeploys on its own — set
+// GENERATION_SECRET only if you'd rather manage the key yourself.
+function loadGenerationSecret(): string {
+  if (process.env.GENERATION_SECRET) return process.env.GENERATION_SECRET;
+
+  const secretPath = path.join(dataDir, "generation-secret");
+  try {
+    const existing = fs.readFileSync(secretPath, "utf8").trim();
+    if (existing) return existing;
+  } catch {
+    /* first boot — fall through and mint one */
+  }
+
+  const secret = crypto.randomBytes(32).toString("hex");
+  try {
+    fs.writeFileSync(secretPath, secret, { mode: 0o600 });
+  } catch (err) {
+    // A read-only data dir isn't fatal: tokens still work, they just stop
+    // verifying across a restart, and the client transparently asks for a new one.
+    console.warn("Could not persist generation secret:", err);
+  }
+  return secret;
+}
+
+const GENERATION_SECRET = loadGenerationSecret();
+
+// Optional. When unset — the normal case — a request is accepted if its Origin
+// matches the Host it was sent to, which is exactly right for a single-domain
+// deploy. Set this only if the page is served from a different domain than the
+// API, or to pin the allowlist harder than same-origin.
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || "")
+  .split(",")
+  .map((o) => o.trim())
+  .filter(Boolean);
+
+const TOKEN_TTL_MS = 2 * 60 * 1000;
+const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
+const RATE_LIMIT_MAX = Number(process.env.GENERATE_RATE_LIMIT) || 12;
+
+// nonce -> expiry. A token is good for exactly one image.
+const consumedTokens = new Map<string, number>();
+// ip -> recent generation timestamps, for the sliding-window rate limit.
+const generationHistory = new Map<string, number[]>();
+
+setInterval(() => {
+  const now = Date.now();
+  for (const [nonce, expiresAt] of consumedTokens) {
+    if (expiresAt < now) consumedTokens.delete(nonce);
+  }
+  for (const [ip, hits] of generationHistory) {
+    const recent = hits.filter((t) => now - t < RATE_LIMIT_WINDOW_MS);
+    if (recent.length) generationHistory.set(ip, recent);
+    else generationHistory.delete(ip);
+  }
+}, 60_000).unref();
+
+function clientIp(req: Request): string {
+  return req.ip || req.socket.remoteAddress || "unknown";
+}
+
+// Tokens travel to the browser, so bind them to a keyed hash of the caller's
+// address rather than the address itself.
+function ipFingerprint(ip: string): string {
+  return crypto
+    .createHmac("sha256", GENERATION_SECRET)
+    .update(ip)
+    .digest("hex")
+    .slice(0, 16);
+}
+
+function requestOrigin(req: Request): string | null {
+  const origin = req.get("origin");
+  if (origin && origin !== "null") return origin;
+  const referer = req.get("referer");
+  if (referer) {
+    try {
+      return new URL(referer).origin;
+    } catch {
+      /* malformed Referer — treat as absent */
+    }
+  }
+  return null;
+}
+
+const LOOPBACK_HOSTNAMES = new Set(["localhost", "127.0.0.1", "::1"]);
+
+// A Host header looks like "localhost:5173" or "[::1]:5173" — strip the port and
+// any IPv6 brackets before comparing.
+function isLoopbackHost(hostHeader: string | undefined): boolean {
+  if (!hostHeader) return false;
+  const hostname = hostHeader.replace(/:\d+$/, "").replace(/^\[|\]$/g, "");
+  return LOOPBACK_HOSTNAMES.has(hostname);
+}
+
+function isAllowedOrigin(req: Request): boolean {
+  const origin = requestOrigin(req);
+  // Browsers always attach Origin to a cross-site or non-GET fetch. A bare
+  // script sends neither header, so the absence is itself the signal.
+  if (!origin) return false;
+
+  // Explicit allowlist wins. Set ALLOWED_ORIGINS in production.
+  if (ALLOWED_ORIGINS.length > 0) return ALLOWED_ORIGINS.includes(origin);
+
+  let originUrl: URL;
+  try {
+    originUrl = new URL(origin);
+  } catch {
+    return false;
+  }
+
+  // Same-origin: the page is being served by this server.
+  const host = req.get("host");
+  if (host && originUrl.host === host) return true;
+
+  // Local development: Vite serves the page on one port and proxies the API to
+  // another, rewriting Host to the proxy target — so the ports never match. This
+  // only applies when the request itself arrived on a loopback address, so on a
+  // real deployment, where Host is the public domain, the branch is dead and the
+  // same-origin check above is the whole rule.
+  return isLoopbackHost(host) && LOOPBACK_HOSTNAMES.has(originUrl.hostname);
+}
+
+function signToken(payload: string): string {
+  const sig = crypto
+    .createHmac("sha256", GENERATION_SECRET)
+    .update(payload)
+    .digest();
+  return `${Buffer.from(payload).toString("base64url")}.${sig.toString("base64url")}`;
+}
+
+function verifyToken(
+  token: string,
+): { nonce: string; expiresAt: number; ip: string } | null {
+  const parts = token.split(".");
+  if (parts.length !== 2) return null;
+
+  let payload: string;
+  let provided: Buffer;
+  try {
+    payload = Buffer.from(parts[0], "base64url").toString("utf8");
+    provided = Buffer.from(parts[1], "base64url");
+  } catch {
+    return null;
+  }
+
+  const expected = crypto
+    .createHmac("sha256", GENERATION_SECRET)
+    .update(payload)
+    .digest();
+  if (provided.length !== expected.length) return null;
+  if (!crypto.timingSafeEqual(provided, expected)) return null;
+
+  const [nonce, expiresAt, ip] = payload.split("|");
+  if (!nonce || !expiresAt || !ip) return null;
+  return { nonce, expiresAt: Number(expiresAt), ip };
+}
+
+// The page mints a fresh token immediately before each generation.
+app.post("/api/generation-token", (req: Request, res: Response) => {
+  if (!isAllowedOrigin(req)) {
+    return res
+      .status(403)
+      .json({ error: "Image generation is only available from Banana City." });
+  }
+  const nonce = crypto.randomBytes(16).toString("hex");
+  const expiresAt = Date.now() + TOKEN_TTL_MS;
+  const token = signToken(
+    `${nonce}|${expiresAt}|${ipFingerprint(clientIp(req))}`,
+  );
+  res.json({ token, expiresAt });
+});
+
+function guardGeneration(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Response | void {
+  if (!isAllowedOrigin(req)) {
+    return res
+      .status(403)
+      .json({ error: "Image generation is only available from Banana City." });
+  }
+
+  const token = req.get("x-generation-token");
+  if (!token) {
+    return res.status(401).json({ error: "Missing generation token." });
+  }
+
+  const claims = verifyToken(token);
+  if (!claims) {
+    return res.status(401).json({ error: "Invalid generation token." });
+  }
+  if (claims.expiresAt < Date.now()) {
+    return res.status(401).json({ error: "Generation token expired." });
+  }
+
+  const ip = clientIp(req);
+  if (claims.ip !== ipFingerprint(ip)) {
+    return res
+      .status(401)
+      .json({ error: "Generation token was issued to a different client." });
+  }
+  if (consumedTokens.has(claims.nonce)) {
+    return res.status(401).json({ error: "Generation token already used." });
+  }
+
+  // Count against the limit before calling Gemini, not after: the request costs
+  // money whether or not it comes back with an image.
+  const now = Date.now();
+  const recent = (generationHistory.get(ip) || []).filter(
+    (t) => now - t < RATE_LIMIT_WINDOW_MS,
+  );
+  if (recent.length >= RATE_LIMIT_MAX) {
+    const retryAfter = Math.ceil(
+      (RATE_LIMIT_WINDOW_MS - (now - recent[0])) / 1000,
+    );
+    res.set("Retry-After", String(retryAfter));
+    return res.status(429).json({
+      error: `You've made ${RATE_LIMIT_MAX} images this hour, which is the limit. Try again later.`,
+    });
+  }
+
+  consumedTokens.set(claims.nonce, claims.expiresAt);
+  recent.push(now);
+  generationHistory.set(ip, recent);
+  next();
+}
+
 app.post(
   "/api/generate-image",
+  guardGeneration,
   async (req: Request, res: Response): Promise<any> => {
     try {
       const { prompt, referenceImages, useMagentaScreen } = req.body;

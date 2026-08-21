@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════
-   ETHEREAL FORGE — Creative Fellowship Artifact
+   BANANA CITY — a shared world built out of prompts
    ═══════════════════════════════════════════════ */
 
 /* ─── Crosshair ─── */
@@ -1728,28 +1728,31 @@
   flex-direction: column;
   align-items: center;
   gap: 0;
+  width: min(560px, calc(100vw - 3rem));
+  max-height: 100vh;
+  padding: 2rem 0;
+  overflow-y: auto;
+  text-align: center;
 }
 
 .scene-loading-logo {
-  width: 240px;
-  height: 240px;
+  width: min(280px, 70vw);
+  height: auto;
   object-fit: contain;
-  margin-bottom: -10px;
+  margin-bottom: -0.25rem;
   opacity: 0;
   animation: sl-fade-up 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.1s forwards;
 }
 
-/* .scene-loading-rule removed — replaced by loading bar */
-
 .scene-loading-title {
   font-family: 'Instrument Serif', Georgia, serif;
-  font-size: 1.6rem;
+  font-size: 2rem;
   font-weight: 400;
   font-style: italic;
   color: #2a2926;
   letter-spacing: 0.01em;
   opacity: 0;
-  animation: sl-fade-up 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.5s forwards;
+  animation: sl-fade-up 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.4s forwards;
 }
 
 .scene-loading-subtitle {
@@ -1761,18 +1764,19 @@
   letter-spacing: 0.18em;
   text-transform: uppercase;
   opacity: 0;
-  animation: sl-fade-up 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.65s forwards;
+  animation: sl-fade-up 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.55s forwards;
 }
 
 .scene-loading-bar-container {
-  margin: 0.5rem 0 0.5rem;
+  margin: 1.4rem 0 0;
   width: 120px;
   height: 3px;
+  flex-shrink: 0;
   background: #e8e5e0;
   border-radius: 2px;
   overflow: hidden;
   opacity: 0;
-  animation: sl-fade-up 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.9s forwards;
+  animation: sl-fade-up 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.7s forwards;
 }
 
 .scene-loading-bar {
@@ -1785,6 +1789,83 @@
 
 .scene-loading-bar.complete {
   animation: sl-fill-complete 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* ─── What this is ─── */
+.scene-loading-blurb {
+  margin: 2rem 0 0;
+  max-width: 40ch;
+  font-family: 'Instrument Serif', Georgia, serif;
+  font-size: 1.05rem;
+  font-weight: 400;
+  line-height: 1.6;
+  color: #55524d;
+  opacity: 0;
+  animation: sl-fade-up 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.95s forwards;
+}
+
+/* ─── How to add to it ─── */
+.scene-loading-steps {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.7rem;
+  margin-top: 2rem;
+  padding-top: 1.6rem;
+  border-top: 1px solid #e8e5e0;
+  width: min(400px, 100%);
+  text-align: left;
+}
+
+.scene-loading-step {
+  display: flex;
+  align-items: baseline;
+  gap: 0.85rem;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.78rem;
+  font-weight: 300;
+  line-height: 1.5;
+  color: #55524d;
+  opacity: 0;
+  animation: sl-fade-up 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.scene-loading-step:nth-child(1) { animation-delay: 1.15s; }
+.scene-loading-step:nth-child(2) { animation-delay: 1.28s; }
+.scene-loading-step:nth-child(3) { animation-delay: 1.41s; }
+
+.scene-loading-step-num {
+  flex-shrink: 0;
+  font-size: 0.6rem;
+  letter-spacing: 0.14em;
+  color: #c4bfb7;
+}
+
+.scene-loading-step kbd {
+  display: inline-block;
+  min-width: 1.5em;
+  padding: 0.1em 0.4em;
+  border: 1px solid #ddd9d3;
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: #fff;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: #2a2926;
+  text-align: center;
+}
+
+.scene-loading-footer {
+  margin-top: 2rem;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.55rem;
+  font-weight: 400;
+  color: #c4bfb7;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  opacity: 0;
+  animation: sl-fade-up 0.7s cubic-bezier(0.16, 1, 0.3, 1) 1.7s forwards;
 }
 
 @keyframes sl-fill-complete {
@@ -1962,6 +2043,53 @@
 @keyframes pause-card-in {
   from { opacity: 0; transform: scale(0.95) translateY(8px); }
   to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.pause-about {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  max-width: 30ch;
+  text-align: center;
+}
+
+.pause-about-title {
+  font-family: 'Instrument Serif', Georgia, serif;
+  font-size: 1.35rem;
+  font-style: italic;
+  color: var(--forge-text);
+  letter-spacing: 0.01em;
+}
+
+.pause-about-text {
+  margin: 0;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.68rem;
+  font-weight: 300;
+  line-height: 1.65;
+  color: var(--forge-text-dim);
+}
+
+.pause-about-cta {
+  color: var(--forge-gold);
+  opacity: 0.75;
+}
+
+.pause-about-cta kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.4em;
+  padding: 0.1em 0.4em;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.6rem;
+  font-weight: 500;
+  color: var(--forge-gold);
+  background: rgba(232, 168, 73, 0.08);
+  border: 1px solid var(--forge-border);
+  border-radius: 4px;
+  line-height: 1.4;
 }
 
 .pause-social-links {
